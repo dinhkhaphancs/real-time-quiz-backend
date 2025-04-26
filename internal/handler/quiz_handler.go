@@ -3,7 +3,9 @@ package handler
 import (
 	"net/http"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -33,45 +35,43 @@ func NewQuizHandler(
 
 // CreateQuiz handles quiz creation by registered users
 func (h *QuizHandler) CreateQuiz(c *gin.Context) {
-	var request struct {
-		Title  string `json:"title" binding:"required"`
-		UserID string `json:"userId" binding:"required"`
-	}
+	var request dto.QuizCreateRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	// Parse user ID
 	creatorID, err := uuid.Parse(request.UserID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid user ID", "The provided user ID is not valid")
 		return
 	}
 
 	// Verify user exists
 	creator, err := h.userService.GetUserByID(c, creatorID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		response.WithError(c, http.StatusBadRequest, "User not found", "The specified user could not be found")
 		return
 	}
 
 	// Create the quiz
 	quiz, err := h.quizService.CreateQuiz(c, request.Title, creatorID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusInternalServerError, "Failed to create quiz", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"quiz": quiz,
-		"creator": map[string]interface{}{
-			"id":    creator.ID,
-			"name":  creator.Name,
-			"email": creator.Email,
-		},
-	})
+	quizResponse := dto.QuizResponseFromModel(quiz)
+	creatorResponse := dto.CreatorResponseFromModel(creator)
+
+	data := map[string]interface{}{
+		"quiz":    quizResponse,
+		"creator": creatorResponse,
+	}
+
+	response.WithSuccess(c, http.StatusCreated, response.MessageCreated, data)
 }
 
 // GetQuiz retrieves quiz details
@@ -79,13 +79,20 @@ func (h *QuizHandler) GetQuiz(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
 	quiz, err := h.quizService.GetQuiz(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusNotFound, "Quiz not found", err.Error())
+		return
+	}
+
+	// Get creator
+	creator, err := h.userService.GetUserByID(c, quiz.CreatorID)
+	if err != nil {
+		response.WithError(c, http.StatusInternalServerError, "Failed to get quiz creator", "Could not retrieve quiz creator information")
 		return
 	}
 
@@ -98,12 +105,42 @@ func (h *QuizHandler) GetQuiz(c *gin.Context) {
 	// Get participants for the quiz
 	participants, _ := h.participantService.GetParticipantsByQuizID(c, id)
 
-	c.JSON(http.StatusOK, gin.H{
-		"quiz":         quiz,
-		"questions":    questions,
-		"session":      session,
-		"participants": participants,
-	})
+	// Convert to DTOs
+	quizResponse := dto.QuizResponseFromModel(quiz)
+	creatorResponse := dto.CreatorResponseFromModel(creator)
+
+	var questionResponses []dto.QuestionResponse
+	for _, q := range questions {
+		// Don't include correct answer in the response unless quiz is finished
+		includeAnswer := session != nil && session.EndedAt != nil
+		questionResponses = append(questionResponses, dto.QuestionResponseFromModel(q, includeAnswer))
+	}
+
+	var participantResponses []dto.ParticipantResponse
+	for _, p := range participants {
+		participantResponses = append(participantResponses, dto.ParticipantResponseFromModel(p))
+	}
+
+	// Create quiz details response
+	quizDetails := dto.QuizDetails{
+		Quiz:         quizResponse,
+		Creator:      creatorResponse,
+		Questions:    questionResponses,
+		Participants: participantResponses,
+	}
+
+	if session != nil {
+		sessionResponse := dto.QuizSession{
+			QuizID:            session.QuizID,
+			Status:            string(session.Status),
+			CurrentQuestionID: session.CurrentQuestionID,
+			StartedAt:         session.StartedAt,
+			EndedAt:           session.EndedAt,
+		}
+		quizDetails.Session = &sessionResponse
+	}
+
+	response.WithSuccess(c, http.StatusOK, response.MessageFetched, quizDetails)
 }
 
 // StartQuiz initiates a quiz session
@@ -111,16 +148,19 @@ func (h *QuizHandler) StartQuiz(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
 	if err := h.quizService.StartQuiz(c, id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to start quiz", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Quiz started successfully"})
+	quizAction := dto.QuizAction{
+		Message: "Quiz started successfully",
+	}
+	response.WithSuccess(c, http.StatusOK, "Quiz started successfully", quizAction)
 }
 
 // EndQuiz ends a quiz session
@@ -128,16 +168,19 @@ func (h *QuizHandler) EndQuiz(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
 	if err := h.quizService.EndQuiz(c, id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to end quiz", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Quiz ended successfully"})
+	quizAction := dto.QuizAction{
+		Message: "Quiz ended successfully",
+	}
+	response.WithSuccess(c, http.StatusOK, "Quiz ended successfully", quizAction)
 }
 
 // JoinQuiz allows a user to join a quiz as a participant
@@ -145,32 +188,25 @@ func (h *QuizHandler) JoinQuiz(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
-	var request struct {
-		Name string `json:"name" binding:"required"`
-	}
+	var request dto.QuizJoinRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	participant, err := h.participantService.JoinQuiz(c, id, request.Name)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to join quiz", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"participant": map[string]interface{}{
-			"id":       participant.ID,
-			"name":     participant.Name,
-			"quizId":   participant.QuizID,
-			"score":    participant.Score,
-			"joinedAt": participant.JoinedAt,
-		},
+	participantResponse := dto.ParticipantResponseFromModel(participant)
+	response.WithSuccess(c, http.StatusOK, "Successfully joined quiz", map[string]interface{}{
+		"participant": participantResponse,
 	})
 }

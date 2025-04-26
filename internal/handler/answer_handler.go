@@ -3,7 +3,9 @@ package handler
 import (
 	"net/http"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -22,44 +24,43 @@ func NewAnswerHandler(answerService service.AnswerService) *AnswerHandler {
 
 // SubmitAnswer handles participant answer submissions
 func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
-	var request struct {
-		ParticipantID  string `json:"participantId" binding:"required"`
-		QuestionID     string `json:"questionId" binding:"required"`
-		SelectedOption string `json:"selectedOption" binding:"required"`
-	}
+	var request dto.AnswerSubmitRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	// Parse UUIDs
 	participantID, err := uuid.Parse(request.ParticipantID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid participant ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid participant ID", "The provided participant ID is not valid")
 		return
 	}
 
 	questionID, err := uuid.Parse(request.QuestionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
 
 	// Submit the answer
 	answer, err := h.answerService.SubmitAnswer(c, participantID, questionID, request.SelectedOption)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to submit answer", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"answer": map[string]interface{}{
-			"id":             answer.ID,
-			"selectedOption": answer.SelectedOption,
-			"isCorrect":      answer.IsCorrect,
-			"score":          answer.Score,
-		},
+	// Create a basic answer response that doesn't include sensitive fields
+	answerResponse := dto.AnswerBasicResponse{
+		ID:             answer.ID,
+		SelectedOption: answer.SelectedOption,
+		IsCorrect:      answer.IsCorrect,
+		Score:          answer.Score,
+	}
+
+	response.WithSuccess(c, http.StatusCreated, "Answer submitted successfully", map[string]interface{}{
+		"answer": answerResponse,
 	})
 }
 
@@ -68,17 +69,19 @@ func (h *AnswerHandler) GetAnswerStats(c *gin.Context) {
 	questionIDStr := c.Param("questionId")
 	questionID, err := uuid.Parse(questionIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
 
 	stats, err := h.answerService.GetAnswerStats(c, questionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusInternalServerError, "Failed to retrieve answer statistics", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"stats": stats})
+	response.WithSuccess(c, http.StatusOK, "Answer statistics retrieved successfully", map[string]interface{}{
+		"stats": stats,
+	})
 }
 
 // GetParticipantAnswer retrieves a specific participant's answer
@@ -88,30 +91,35 @@ func (h *AnswerHandler) GetParticipantAnswer(c *gin.Context) {
 
 	participantID, err := uuid.Parse(participantIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid participant ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid participant ID", "The provided participant ID is not valid")
 		return
 	}
 
 	questionID, err := uuid.Parse(questionIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
 
 	answer, err := h.answerService.GetParticipantAnswer(c, participantID, questionID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusNotFound, "Answer not found", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"answer": map[string]interface{}{
-			"id":             answer.ID,
-			"selectedOption": answer.SelectedOption,
-			"isCorrect":      answer.IsCorrect,
-			"score":          answer.Score,
-			"answeredAt":     answer.AnsweredAt,
-			"timeTaken":      answer.TimeTaken,
-		},
+	// Convert to full answer response DTO
+	answerResponse := dto.AnswerResponse{
+		ID:             answer.ID,
+		ParticipantID:  answer.ParticipantID,
+		QuestionID:     answer.QuestionID,
+		SelectedOption: answer.SelectedOption,
+		IsCorrect:      answer.IsCorrect,
+		Score:          answer.Score,
+		AnsweredAt:     answer.AnsweredAt,
+		TimeTaken:      answer.TimeTaken,
+	}
+
+	response.WithSuccess(c, http.StatusOK, response.MessageFetched, map[string]interface{}{
+		"answer": answerResponse,
 	})
 }

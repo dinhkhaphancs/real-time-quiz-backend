@@ -3,8 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -23,23 +24,17 @@ func NewQuestionHandler(questionService service.QuestionService) *QuestionHandle
 
 // AddQuestion adds a new question to a quiz
 func (h *QuestionHandler) AddQuestion(c *gin.Context) {
-	var request struct {
-		QuizID       string        `json:"quizId" binding:"required"`
-		Text         string        `json:"text" binding:"required"`
-		Options      []model.Option `json:"options" binding:"required,len=4"`
-		CorrectAnswer string        `json:"correctAnswer" binding:"required"`
-		TimeLimit    int           `json:"timeLimit" binding:"required,min=5,max=60"`
-	}
+	var request dto.QuestionCreateRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())
 		return
 	}
 
 	// Parse quiz ID
 	quizID, err := uuid.Parse(request.QuizID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
@@ -53,11 +48,14 @@ func (h *QuestionHandler) AddQuestion(c *gin.Context) {
 		request.TimeLimit,
 	)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to create question", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"question": question})
+	questionResponse := dto.QuestionResponseFromModel(question, true)
+	response.WithSuccess(c, http.StatusCreated, response.MessageCreated, map[string]interface{}{
+		"question": questionResponse,
+	})
 }
 
 // GetQuestions retrieves all questions for a quiz
@@ -65,17 +63,24 @@ func (h *QuestionHandler) GetQuestions(c *gin.Context) {
 	quizIDStr := c.Param("quizId")
 	quizID, err := uuid.Parse(quizIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
 	questions, err := h.questionService.GetQuestions(c, quizID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusInternalServerError, "Failed to retrieve questions", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"questions": questions})
+	var responseQuestions []dto.QuestionResponse
+	for _, q := range questions {
+		responseQuestions = append(responseQuestions, dto.QuestionResponseFromModel(q, true))
+	}
+
+	response.WithSuccess(c, http.StatusOK, response.MessageListFetched, map[string]interface{}{
+		"questions": responseQuestions,
+	})
 }
 
 // GetQuestion retrieves a specific question
@@ -83,17 +88,20 @@ func (h *QuestionHandler) GetQuestion(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
 
 	question, err := h.questionService.GetQuestion(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusNotFound, "Question not found", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"question": question})
+	questionResponse := dto.QuestionResponseFromModel(question, true)
+	response.WithSuccess(c, http.StatusOK, response.MessageFetched, map[string]interface{}{
+		"question": questionResponse,
+	})
 }
 
 // StartQuestion begins a question in a quiz
@@ -101,24 +109,27 @@ func (h *QuestionHandler) StartQuestion(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
 
 	// Get the question to determine quiz ID
 	question, err := h.questionService.GetQuestion(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusNotFound, "Question not found", err.Error())
 		return
 	}
 
 	// Start the question
 	if err := h.questionService.StartQuestion(c, question.QuizID, id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to start question", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Question started successfully"})
+	questionAction := dto.QuestionAction{
+		Message: "Question started successfully",
+	}
+	response.WithSuccess(c, http.StatusOK, "Question started successfully", questionAction)
 }
 
 // EndQuestion ends the current question in a quiz
@@ -126,24 +137,27 @@ func (h *QuestionHandler) EndQuestion(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
 
 	// Get the question to determine quiz ID
 	question, err := h.questionService.GetQuestion(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusNotFound, "Question not found", err.Error())
 		return
 	}
 
 	// End the question
 	if err := h.questionService.EndQuestion(c, question.QuizID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusBadRequest, "Failed to end question", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Question ended successfully"})
+	questionAction := dto.QuestionAction{
+		Message: "Question ended successfully",
+	}
+	response.WithSuccess(c, http.StatusOK, "Question ended successfully", questionAction)
 }
 
 // GetNextQuestion retrieves the next question in sequence
@@ -151,15 +165,19 @@ func (h *QuestionHandler) GetNextQuestion(c *gin.Context) {
 	quizIDStr := c.Param("quizId")
 	quizID, err := uuid.Parse(quizIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
 	question, err := h.questionService.GetNextQuestion(c, quizID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.WithError(c, http.StatusNotFound, "No next question available", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"question": question})
+	// Don't include the correct answer when returning the next question
+	questionResponse := dto.QuestionResponseFromModel(question, false)
+	response.WithSuccess(c, http.StatusOK, "Next question fetched successfully", map[string]interface{}{
+		"question": questionResponse,
+	})
 }

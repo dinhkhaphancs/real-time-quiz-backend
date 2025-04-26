@@ -229,6 +229,9 @@ sequenceDiagram
 - ✅ Improved real-time event broadcasting with specific targeting (to creators or participants)
 - ✅ Implemented user registration and login endpoints
 - ✅ Enhanced architecture documentation and system design explanations
+- ✅ Standardized DTO naming convention - removed redundant "Dto" suffix from DTOs in the dto package
+- ✅ Implemented unified API response pattern with standardized error and success handling
+- ✅ Created consistent response formatting across all API endpoints
 
 ### Current Implementation Status
 
@@ -241,6 +244,88 @@ sequenceDiagram
 - ✅ Real-time leaderboard updates
 - ✅ Basic quiz flow (waiting, active, completed states)
 - ✅ Role-based WebSocket communication (different events for creators vs participants)
+
+### Standardized Response Pattern
+
+The application now implements a consistent response pattern for all API endpoints:
+
+1. **Standardized Response Structure**:
+   ```json
+   {
+     "success": true,
+     "message": "Resource created successfully",
+     "data": { ... },
+     "timestamp": "2025-04-26T12:34:56Z"
+   }
+   ```
+   
+2. **Consistent Error Handling**:
+   ```json
+   {
+     "success": false,
+     "message": "Validation error",
+     "error": "Detailed error description",
+     "timestamp": "2025-04-26T12:34:56Z"
+   }
+   ```
+
+3. **Support for Pagination**:
+   ```json
+   {
+     "success": true,
+     "message": "Resources fetched successfully",
+     "data": [ ... ],
+     "pagination": {
+       "total": 100,
+       "perPage": 10,
+       "currentPage": 1,
+       "lastPage": 10
+     },
+     "timestamp": "2025-04-26T12:34:56Z"
+   }
+   ```
+
+The response pattern offers:
+- Clear success/failure indication with the `success` boolean
+- User-friendly messages with the `message` field
+- Detailed error information in the `error` field
+- Consistent structure across all endpoints (REST and WebSocket)
+- Automatic timestamp inclusion for logging and debugging
+
+### Code Organization
+
+The project follows a clean architecture with clear separation of concerns:
+
+1. **DTO Layer** (`/internal/dto/`):
+   - Data Transfer Objects for API request/response
+   - Simplified naming convention (removed redundant "Dto" suffix)
+   - Conversion functions from domain models to DTOs
+
+2. **Handler Layer** (`/internal/handler/`):
+   - API endpoints using Gin framework
+   - Standardized response handling
+   - Request validation
+   - WebSocket connection management
+
+3. **Service Layer** (`/internal/service/`):
+   - Business logic implementation
+   - Transaction management
+   - Domain validations
+
+4. **Repository Layer** (`/internal/repository/`):
+   - Data access abstraction
+   - Database interactions
+   - Query construction
+
+5. **Model Layer** (`/internal/model/`):
+   - Domain models representing core business entities
+   - Business rules and validations
+
+6. **Utility Packages** (`/pkg/`):
+   - `response`: Standardized API response handling
+   - `websocket`: WebSocket implementation
+   - `logger`: Application logging
+   - `validator`: Input validation utilities
 
 ### TODO to Fulfill Requirements
 

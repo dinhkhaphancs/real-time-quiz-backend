@@ -111,7 +111,7 @@ func main() {
 	quizHandler := handler.NewQuizHandler(quizService, questionService, userService, participantService)
 	questionHandler := handler.NewQuestionHandler(questionService)
 	answerHandler := handler.NewAnswerHandler(answerService)
-	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardService)
+	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardService, quizService)
 	wsHandler := handler.NewWebSocketHandler(wsHub, quizService, userService, participantService)
 
 	// Initialize Gin router

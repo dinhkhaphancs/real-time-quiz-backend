@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
-	my_ws "github.com/dinhkhaphancs/real-time-quiz-backend/pkg/websocket"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/response"
+	ws "github.com/dinhkhaphancs/real-time-quiz-backend/pkg/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -12,7 +13,7 @@ import (
 
 // WebSocketHandler handles WebSocket connections
 type WebSocketHandler struct {
-	hub                *my_ws.RedisHub
+	hub                *ws.RedisHub
 	quizService        service.QuizService
 	userService        service.UserService
 	participantService service.ParticipantService
@@ -20,7 +21,7 @@ type WebSocketHandler struct {
 
 // NewWebSocketHandler creates a new WebSocket handler
 func NewWebSocketHandler(
-	hub *my_ws.RedisHub,
+	hub *ws.RedisHub,
 	quizService service.QuizService,
 	userService service.UserService,
 	participantService service.ParticipantService,
@@ -47,7 +48,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	quizIDStr := c.Param("quizId")
 	quizID, err := uuid.Parse(quizIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiz ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
 
@@ -56,7 +57,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		response.WithError(c, http.StatusBadRequest, "Invalid ID", "The provided user or participant ID is not valid")
 		return
 	}
 
@@ -69,19 +70,19 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		// Get user to validate
 		user, err := h.userService.GetUserByID(c, id)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+			response.WithError(c, http.StatusUnauthorized, "Authentication failed", "User not found")
 			return
 		}
 
 		// Check if user is the creator of this quiz
 		quiz, err := h.quizService.GetQuiz(c, quizID)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Quiz not found"})
+			response.WithError(c, http.StatusNotFound, "Quiz not found", "The specified quiz could not be found")
 			return
 		}
 
 		if quiz.CreatorID != user.ID {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not the creator of this quiz"})
+			response.WithError(c, http.StatusUnauthorized, "Authorization failed", "User is not the creator of this quiz")
 			return
 		}
 
@@ -92,25 +93,25 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		// Get participant to validate
 		participant, err := h.participantService.GetParticipantByID(c, id)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Participant not found"})
+			response.WithError(c, http.StatusUnauthorized, "Authentication failed", "Participant not found")
 			return
 		}
 
 		if participant.QuizID != quizID {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Participant not authorized for this quiz"})
+			response.WithError(c, http.StatusUnauthorized, "Authorization failed", "Participant not authorized for this quiz")
 			return
 		}
 
 		userName = participant.Name
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid connection type"})
+		response.WithError(c, http.StatusBadRequest, "Invalid connection type", "Connection type must be 'user' or 'participant'")
 		return
 	}
 
 	// Upgrade connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upgrade connection"})
+		response.WithError(c, http.StatusInternalServerError, "Connection error", "Failed to upgrade connection to WebSocket")
 		return
 	}
 
@@ -118,7 +119,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	clientID := uuid.New()
 
 	// Create a new client
-	client := &my_ws.Client{
+	client := &ws.Client{
 		ID:        clientID,
 		UserID:    id,
 		QuizID:    quizID,
@@ -129,7 +130,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 
 	// Subscribe to Redis events for this quiz if not already subscribed
 	if err := h.hub.SubscribeToQuiz(quizID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe to quiz events"})
+		response.WithError(c, http.StatusInternalServerError, "Subscription error", "Failed to subscribe to quiz events")
 		conn.Close()
 		return
 	}
@@ -144,8 +145,8 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 
 	// Notify other clients about the new connection (only for participants)
 	if !isCreator {
-		h.hub.PublishToQuiz(quizID, my_ws.Event{
-			Type: my_ws.EventUserJoined,
+		h.hub.PublishToQuiz(quizID, ws.Event{
+			Type: ws.EventUserJoined,
 			Payload: map[string]interface{}{
 				"id":   id.String(),
 				"name": userName,
