@@ -11,8 +11,7 @@ import (
 
 // QuizCreateRequest represents the request to create a new quiz
 type QuizCreateRequest struct {
-	Title  string `json:"title" binding:"required"`
-	UserID string `json:"userId" binding:"required"`
+	Title string `json:"title" binding:"required"`
 }
 
 // QuizResponse represents a quiz in API responses

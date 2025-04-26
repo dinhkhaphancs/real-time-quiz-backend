@@ -55,14 +55,12 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.Login(c, request.Email, request.Password)
+	loginResponse, err := h.userService.LoginWithToken(c, request.Email, request.Password)
 	if err != nil {
 		// Return 401 for any login error
 		response.WithError(c, http.StatusUnauthorized, "Authentication failed", "Invalid email or password")
 		return
 	}
 
-	// Convert user model to DTO response
-	userResponse := dto.UserResponseFromModel(user)
-	response.WithSuccess(c, http.StatusOK, "Login successful", userResponse)
+	response.WithSuccess(c, http.StatusOK, "Login successful", loginResponse)
 }

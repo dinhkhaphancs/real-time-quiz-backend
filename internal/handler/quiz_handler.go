@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/middleware"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -42,17 +43,17 @@ func (h *QuizHandler) CreateQuiz(c *gin.Context) {
 		return
 	}
 
-	// Parse user ID
-	creatorID, err := uuid.Parse(request.UserID)
-	if err != nil {
-		response.WithError(c, http.StatusBadRequest, "Invalid user ID", "The provided user ID is not valid")
+	// Get the authenticated user ID from the JWT context
+	creatorID := middleware.GetAuthUserID(c)
+	if creatorID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
 		return
 	}
 
-	// Verify user exists
+	// Verify user exists (optional since JWT middleware already validated the token)
 	creator, err := h.userService.GetUserByID(c, creatorID)
 	if err != nil {
-		response.WithError(c, http.StatusBadRequest, "User not found", "The specified user could not be found")
+		response.WithError(c, http.StatusBadRequest, "User not found", "The authenticated user could not be found")
 		return
 	}
 
@@ -152,6 +153,26 @@ func (h *QuizHandler) StartQuiz(c *gin.Context) {
 		return
 	}
 
+	// Get authenticated user ID from JWT context
+	userID := middleware.GetAuthUserID(c)
+	if userID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
+		return
+	}
+
+	// Verify ownership by getting the quiz first
+	quiz, err := h.quizService.GetQuiz(c, id)
+	if err != nil {
+		response.WithError(c, http.StatusNotFound, "Quiz not found", err.Error())
+		return
+	}
+
+	// Check if the authenticated user is the quiz creator
+	if quiz.CreatorID != userID {
+		response.WithError(c, http.StatusForbidden, "Access denied", "Only the quiz creator can start this quiz")
+		return
+	}
+
 	if err := h.quizService.StartQuiz(c, id); err != nil {
 		response.WithError(c, http.StatusBadRequest, "Failed to start quiz", err.Error())
 		return
@@ -169,6 +190,26 @@ func (h *QuizHandler) EndQuiz(c *gin.Context) {
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
+		return
+	}
+
+	// Get authenticated user ID from JWT context
+	userID := middleware.GetAuthUserID(c)
+	if userID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
+		return
+	}
+
+	// Verify ownership by getting the quiz first
+	quiz, err := h.quizService.GetQuiz(c, id)
+	if err != nil {
+		response.WithError(c, http.StatusNotFound, "Quiz not found", err.Error())
+		return
+	}
+
+	// Check if the authenticated user is the quiz creator
+	if quiz.CreatorID != userID {
+		response.WithError(c, http.StatusForbidden, "Access denied", "Only the quiz creator can end this quiz")
 		return
 	}
 

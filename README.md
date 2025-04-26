@@ -222,6 +222,70 @@ sequenceDiagram
   - PostgreSQL: Primary database for storing quiz data, questions, users, and answers
   - Redis: For real-time communication, leaderboard caching, and session management
 
+## JWT Authentication
+
+The application now implements JWT (JSON Web Token) authentication to secure protected endpoints and verify user identity.
+
+### Authentication Flow
+
+1. **Registration & Login**:
+   - Users register with email, name, and password
+   - Upon login, the system generates access and refresh tokens
+   - The access token is short-lived (24h in development, 12h in production)
+   - The refresh token has a longer lifespan (7 days)
+
+2. **Protected Endpoints**:
+   - Creating quizzes
+   - Managing quizzes (start/end)
+   - Adding and managing questions
+   - Certain WebSocket connections
+
+3. **Token Usage**:
+   - Include the JWT token in the `Authorization` header
+   - Format: `Bearer <your_jwt_token>`
+   - The token contains user identity information
+
+4. **Ownership Verification**:
+   - The system verifies quiz ownership for operations like:
+     - Starting/ending quizzes
+     - Adding/managing questions
+   - Only quiz creators can perform these actions on their quizzes
+
+### Implementation Details
+
+1. **Configuration**: 
+   - JWT settings in `config.yaml` and `config.production.yaml`
+   - Environment variables for secret keys (in production)
+   - Configurable expiration times for both token types
+
+2. **Components**:
+   - `pkg/auth/jwt.go`: Core JWT generation and validation
+   - `internal/middleware/jwt_middleware.go`: Authentication middleware for routes
+   - `internal/service/user_service.go`: Token generation during login
+
+3. **Protected Routes**:
+   - Quiz creation & management: `/api/v1/quizzes`
+   - Question management: `/api/v1/questions`
+
+### Security Considerations
+
+1. **Token Storage**:
+   - Store tokens securely on the client side
+   - Refresh tokens require additional security measures
+   - Use HTTPS in production environments
+
+2. **Token Validation**:
+   - Signatures are validated on every request
+   - Expired tokens are rejected
+   - Tokens contain only necessary user information
+
+3. **Authorization**:
+   - Role-based authorization using token claims
+   - Resource ownership verification
+   - Proper error messages without leaking sensitive information
+
+The JWT implementation improves security by eliminating the need to pass user IDs in request bodies, preventing impersonation attacks. It also enables stateless authentication that scales well in distributed environments.
+
 ## Recent Changes and Current Implementation Status
 
 - ✅ Refactored the user model to separate Users (creators) and Participants
@@ -232,11 +296,15 @@ sequenceDiagram
 - ✅ Standardized DTO naming convention - removed redundant "Dto" suffix from DTOs in the dto package
 - ✅ Implemented unified API response pattern with standardized error and success handling
 - ✅ Created consistent response formatting across all API endpoints
+- ✅ Added JWT authentication with token-based authorization
+- ✅ Implemented protected routes for quiz and question management
+- ✅ Added ownership verification for quiz operations
 
 ### Current Implementation Status
 
 - ✅ Basic API structure with handlers, services, and repositories
 - ✅ User authentication endpoints (registration, login)
+- ✅ JWT token-based authentication system
 - ✅ WebSocket implementation for real-time communication
 - ✅ Quiz creation and management
 - ✅ Question management
@@ -333,8 +401,8 @@ The project follows a clean architecture with clear separation of concerns:
 
 1. **Authentication System**:
    - ✅ User registration and login endpoints
-   - [ ] JWT authentication middleware
-   - [ ] User authorization for quiz management
+   - ✅ JWT authentication middleware
+   - ✅ User authorization for quiz management
    - [ ] Secure WebSocket connections
 
 2. **Model Refinements**:

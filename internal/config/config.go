@@ -15,6 +15,7 @@ type Config struct {
 	Server   ServerConfig
 	Postgres PostgresConfig
 	Redis    RedisConfig
+	JWT      JWTConfig
 }
 
 // ServerConfig represents HTTP server configuration
@@ -41,6 +42,16 @@ type RedisConfig struct {
 	Port     int    `mapstructure:"port"`
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
+}
+
+// JWTConfig represents JWT authentication configuration
+type JWTConfig struct {
+	Secret           string        `mapstructure:"secret"`
+	ExpirationTime   time.Duration `mapstructure:"expiration_time"`
+	RefreshSecret    string        `mapstructure:"refresh_secret"`
+	RefreshExpTime   time.Duration `mapstructure:"refresh_expiration_time"`
+	SigningAlgorithm string        `mapstructure:"signing_algorithm"`
+	Issuer           string        `mapstructure:"issuer"`
 }
 
 // LoadConfig loads configuration from various sources in the following order of precedence:
@@ -101,6 +112,14 @@ func bindEnvVariables(v *viper.Viper) {
 	v.BindEnv("redis.port", "REDIS_PORT")
 	v.BindEnv("redis.password", "REDIS_PASSWORD")
 	v.BindEnv("redis.db", "REDIS_DB")
+
+	// JWT environment variables
+	v.BindEnv("jwt.secret", "JWT_SECRET")
+	v.BindEnv("jwt.expiration_time", "JWT_EXPIRATION_TIME")
+	v.BindEnv("jwt.refresh_secret", "JWT_REFRESH_SECRET")
+	v.BindEnv("jwt.refresh_expiration_time", "JWT_REFRESH_EXPIRATION_TIME")
+	v.BindEnv("jwt.signing_algorithm", "JWT_SIGNING_ALGORITHM")
+	v.BindEnv("jwt.issuer", "JWT_ISSUER")
 }
 
 // getConfigFile returns the config file path from APP_CONFIG_FILE environment variable

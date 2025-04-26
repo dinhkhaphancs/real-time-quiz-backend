@@ -33,6 +33,27 @@
         },
         {
           "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = JSON.parse(responseBody);",
+                  "if (jsonData && jsonData.data) {",
+                  "    // Save the access token to use in subsequent requests",
+                  "    pm.collectionVariables.set('accessToken', jsonData.data.access_token);",
+                  "    pm.collectionVariables.set('refreshToken', jsonData.data.refresh_token);",
+                  "    ",
+                  "    // Also save the user ID for convenience",
+                  "    if (jsonData.data.user && jsonData.data.user.id) {",
+                  "        pm.collectionVariables.set('userId', jsonData.data.user.id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -50,11 +71,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "users", "login"]
             },
-            "description": "Login with user credentials"
+            "description": "Login with user credentials and receive a JWT token"
           },
           "response": []
         }
-      ]
+      ],
+      "description": "Endpoints for user registration and authentication"
     },
     {
       "name": "Quiz Management",
@@ -67,18 +89,22 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"title\": \"General Knowledge Quiz\",\n    \"userId\": \"{{userId}}\"\n}"
+              "raw": "{\n    \"title\": \"General Knowledge Quiz\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/quizzes",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "quizzes"]
             },
-            "description": "Create a new quiz. Use the userId from the registration/login response."
+            "description": "Create a new quiz. Requires JWT authentication."
           },
           "response": []
         },
@@ -92,7 +118,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "quizzes", "{{quizId}}"]
             },
-            "description": "Get details of a specific quiz by its ID"
+            "description": "Get details of a specific quiz by its ID (public route)"
           },
           "response": []
         },
@@ -100,13 +126,18 @@
           "name": "Start Quiz",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}/start",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "quizzes", "{{quizId}}", "start"]
             },
-            "description": "Start a quiz session"
+            "description": "Start a quiz session. Requires JWT authentication."
           },
           "response": []
         },
@@ -114,13 +145,18 @@
           "name": "End Quiz",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}/end",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "quizzes", "{{quizId}}", "end"]
             },
-            "description": "End a quiz session"
+            "description": "End a quiz session. Requires JWT authentication."
           },
           "response": []
         },
@@ -143,7 +179,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "quizzes", "{{quizId}}", "join"]
             },
-            "description": "Join a quiz as a participant"
+            "description": "Join a quiz as a participant (public route)"
           },
           "response": []
         }
@@ -162,7 +198,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "participants", "{{participantId}}"]
             },
-            "description": "Get details of a specific participant"
+            "description": "Get details of a specific participant (public route)"
           },
           "response": []
         },
@@ -176,7 +212,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "participants", "quiz", "{{quizId}}"]
             },
-            "description": "Get all participants for a specific quiz"
+            "description": "Get all participants for a specific quiz (public route)"
           },
           "response": []
         },
@@ -190,7 +226,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "participants", "{{participantId}}"]
             },
-            "description": "Remove a participant from a quiz. This can only be done if the quiz hasn't started yet."
+            "description": "Remove a participant from a quiz. This can only be done if the quiz hasn't started yet. (public route)"
           },
           "response": []
         }
@@ -207,6 +243,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
             "body": {
@@ -218,7 +258,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "questions"]
             },
-            "description": "Add a new question to a quiz"
+            "description": "Add a new question to a quiz. Requires JWT authentication."
           },
           "response": []
         },
@@ -232,7 +272,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "questions", "{{questionId}}"]
             },
-            "description": "Get details of a specific question"
+            "description": "Get details of a specific question (public route)"
           },
           "response": []
         },
@@ -246,7 +286,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "questions", "quiz", "{{quizId}}"]
             },
-            "description": "Get all questions for a specific quiz"
+            "description": "Get all questions for a specific quiz (public route)"
           },
           "response": []
         },
@@ -260,7 +300,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "questions", "quiz", "{{quizId}}", "next"]
             },
-            "description": "Get the next active question for a quiz"
+            "description": "Get the next active question for a quiz (public route)"
           },
           "response": []
         },
@@ -268,13 +308,18 @@
           "name": "Start Question",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}/start",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "questions", "{{questionId}}", "start"]
             },
-            "description": "Start a specific question in the quiz"
+            "description": "Start a specific question in the quiz. Requires JWT authentication."
           },
           "response": []
         },
@@ -282,13 +327,18 @@
           "name": "End Question",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}/end",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "questions", "{{questionId}}", "end"]
             },
-            "description": "End a specific question in the quiz"
+            "description": "End a specific question in the quiz. Requires JWT authentication."
           },
           "response": []
         }
@@ -316,7 +366,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "answers"]
             },
-            "description": "Submit an answer to a question"
+            "description": "Submit an answer to a question (public route)"
           },
           "response": []
         },
@@ -330,7 +380,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "answers", "question", "{{questionId}}", "stats"]
             },
-            "description": "Get statistics for answers to a specific question"
+            "description": "Get statistics for answers to a specific question (public route)"
           },
           "response": []
         },
@@ -344,7 +394,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "answers", "participant", "{{participantId}}", "question", "{{questionId}}"]
             },
-            "description": "Get a specific participant's answer to a question"
+            "description": "Get a specific participant's answer to a question (public route)"
           },
           "response": []
         }
@@ -363,7 +413,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "leaderboard", "quiz", "{{quizId}}"]
             },
-            "description": "Get the leaderboard for a specific quiz"
+            "description": "Get the leaderboard for a specific quiz (public route)"
           },
           "response": []
         }
@@ -376,13 +426,18 @@
           "name": "Connect as Quiz Creator",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{wsBaseUrl}}/ws/{{quizId}}/user/{{userId}}",
               "host": ["{{wsBaseUrl}}"],
               "path": ["ws", "{{quizId}}", "user", "{{userId}}"]
             },
-            "description": "Connect to WebSocket as quiz creator. Note that this needs to be tested in a WebSocket client, not directly in Postman."
+            "description": "Connect to WebSocket as quiz creator. Note that this needs to be tested in a WebSocket client, not directly in Postman. Requires JWT authentication header."
           },
           "response": []
         },
@@ -401,6 +456,26 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Token Information",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "me"]
+            },
+            "description": "Example request to showcase JWT token - not actually implemented in the API"
+          },
+          "response": []
+        }
+      ],
+      "description": "Information about JWT token usage"
     }
   ],
   "event": [
@@ -453,6 +528,18 @@
       "value": "",
       "type": "string",
       "description": "Participant ID from join quiz response"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token from login response"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT refresh token from login response"
     }
   ]
 }

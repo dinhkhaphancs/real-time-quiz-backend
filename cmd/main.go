@@ -12,8 +12,10 @@ import (
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/config"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/handler"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/middleware"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/repository"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/auth"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/websocket"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -68,8 +70,12 @@ func main() {
 	participantRepo := repository.NewPostgresParticipantRepository(db)
 	answerRepo := repository.NewPostgresAnswerRepository(db)
 
+	// Initialize JWT manager
+	jwtManager := auth.NewJWTManager(cfg.JWT)
+	log.Println("Initialized JWT authentication manager")
+
 	// Initialize services
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo, jwtManager)
 	participantService := service.NewParticipantService(participantRepo, quizRepo, wsHub)
 	quizService := service.NewQuizService(quizRepo, userRepo, questionRepo, wsHub)
 	questionService := service.NewQuestionService(quizRepo, questionRepo, wsHub)
@@ -79,7 +85,7 @@ func main() {
 	// Initialize handlers
 	userHandler := handler.NewUserHandler(userService)
 	quizHandler := handler.NewQuizHandler(quizService, questionService, userService, participantService)
-	questionHandler := handler.NewQuestionHandler(questionService)
+	questionHandler := handler.NewQuestionHandler(questionService, quizService)
 	answerHandler := handler.NewAnswerHandler(answerService)
 	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardService, quizService)
 	wsHandler := handler.NewWebSocketHandler(wsHub, quizService, userService, participantService)
@@ -108,23 +114,35 @@ func main() {
 			userRoutes.POST("/login", userHandler.LoginUser)
 		}
 
-		// Quiz routes
+		// Create auth middleware
+		authMiddleware := middleware.JWTAuthMiddleware(jwtManager)
+
+		// Protected routes (require authentication)
+		authorized := apiV1.Group("")
+		authorized.Use(authMiddleware)
+		{
+			// Quiz routes - creating/managing quizzes requires authentication
+			authorized.POST("/quizzes", quizHandler.CreateQuiz)
+			authorized.POST("/quizzes/:id/start", quizHandler.StartQuiz)
+			authorized.POST("/quizzes/:id/end", quizHandler.EndQuiz)
+
+			// Question routes - adding/managing questions requires authentication
+			authorized.POST("/questions", questionHandler.AddQuestion)
+			authorized.POST("/questions/:id/start", questionHandler.StartQuestion)
+			authorized.POST("/questions/:id/end", questionHandler.EndQuestion)
+		}
+
+		// Public quiz routes - viewing quizzes and joining as participant is public
 		quizRoutes := apiV1.Group("/quizzes")
 		{
-			quizRoutes.POST("", quizHandler.CreateQuiz)
 			quizRoutes.GET("/:id", quizHandler.GetQuiz)
-			quizRoutes.POST("/:id/start", quizHandler.StartQuiz)
-			quizRoutes.POST("/:id/end", quizHandler.EndQuiz)
 			quizRoutes.POST("/:id/join", quizHandler.JoinQuiz)
 		}
 
-		// Question routes
+		// Public question routes - viewing questions is public
 		questionRoutes := apiV1.Group("/questions")
 		{
-			questionRoutes.POST("", questionHandler.AddQuestion)
 			questionRoutes.GET("/:id", questionHandler.GetQuestion)
-			questionRoutes.POST("/:id/start", questionHandler.StartQuestion)
-			questionRoutes.POST("/:id/end", questionHandler.EndQuestion)
 			questionRoutes.GET("/quiz/:quizId", questionHandler.GetQuestions)
 			questionRoutes.GET("/quiz/:quizId/next", questionHandler.GetNextQuestion)
 		}

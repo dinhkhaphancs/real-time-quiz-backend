@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/google/uuid"
 )
@@ -74,6 +75,9 @@ type UserService interface {
 
 	// Login authenticates a user and returns user data
 	Login(ctx context.Context, email string, password string) (*model.User, error)
+
+	// LoginWithToken authenticates a user and returns user data with JWT tokens
+	LoginWithToken(ctx context.Context, email string, password string) (*dto.UserLoginResponse, error)
 
 	// GetUserByID retrieves a user by ID
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)

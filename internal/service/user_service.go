@@ -4,20 +4,24 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/repository"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/auth"
 	"github.com/google/uuid"
 )
 
 // userServiceImpl implements UserService interface
 type userServiceImpl struct {
-	userRepo repository.UserRepository
+	userRepo   repository.UserRepository
+	jwtManager *auth.JWTManager
 }
 
 // NewUserService creates a new user service
-func NewUserService(userRepo repository.UserRepository) UserService {
+func NewUserService(userRepo repository.UserRepository, jwtManager *auth.JWTManager) UserService {
 	return &userServiceImpl{
-		userRepo: userRepo,
+		userRepo:   userRepo,
+		jwtManager: jwtManager,
 	}
 }
 
@@ -68,6 +72,39 @@ func (s *userServiceImpl) Login(ctx context.Context, email string, password stri
 	}
 
 	return user, nil
+}
+
+// LoginWithToken authenticates a user and returns user data with JWT tokens
+func (s *userServiceImpl) LoginWithToken(ctx context.Context, email string, password string) (*dto.UserLoginResponse, error) {
+	// First authenticate the user using the existing login method
+	user, err := s.Login(ctx, email, password)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate access token
+	accessToken, err := s.jwtManager.GenerateToken(user.ID, user.Email)
+	if err != nil {
+		return nil, errors.New("failed to generate access token")
+	}
+
+	// Generate refresh token
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate refresh token")
+	}
+
+	// Create response with user data and tokens
+	userResponse := dto.UserResponseFromModel(user)
+	response := &dto.UserLoginResponse{
+		User:         userResponse,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    int64(s.jwtManager.GetConfig().ExpirationTime.Seconds()),
+	}
+
+	return response, nil
 }
 
 // GetUserByID retrieves a user by ID
