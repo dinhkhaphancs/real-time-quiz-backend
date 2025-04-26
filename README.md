@@ -351,6 +351,95 @@ Response:
 
 The existing participant API endpoints (`/api/v1/participants/*`) remain unchanged as they operate using UUIDs for internal consistency.
 
+## Database Migrations
+
+This project uses [golang-migrate](https://github.com/golang-migrate/migrate) to manage database schema changes. We've implemented a structured approach to ensure your database stays in sync with the codebase.
+
+### Migration Files Structure
+
+All migrations are stored in the `migrations/versioned` directory following the naming convention:
+```
+{version}_{description}.up.sql   # For applying a migration
+{version}_{description}.down.sql # For rolling back a migration
+```
+
+### Setting Up the Migration Tool
+
+1. Install golang-migrate:
+   ```bash
+   # macOS (using Homebrew)
+   brew install golang-migrate
+
+   # Or using Go
+   go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+   ```
+
+2. Run the setup script to convert existing migration files:
+   ```bash
+   ./scripts/setup_migrations.sh
+   ```
+   This script will organize your migrations into the versioned format required by golang-migrate.
+
+### Managing Migrations
+
+The Makefile provides several targets to manage database migrations:
+
+1. **Create a new migration**:
+   ```bash
+   make migrate-create name=add_new_feature
+   ```
+   This creates two new files in the `migrations/versioned` directory:
+   - `{timestamp}_add_new_feature.up.sql` (apply changes)
+   - `{timestamp}_add_new_feature.down.sql` (roll back changes)
+
+2. **Apply all pending migrations**:
+   ```bash
+   DB_URL="postgres://username:password@localhost:5432/quiz_db?sslmode=disable" make migrate-up
+   ```
+
+3. **Roll back the last migration**:
+   ```bash
+   DB_URL="postgres://username:password@localhost:5432/quiz_db?sslmode=disable" make migrate-down-one
+   ```
+
+4. **Roll back all migrations**:
+   ```bash
+   DB_URL="postgres://username:password@localhost:5432/quiz_db?sslmode=disable" make migrate-down
+   ```
+
+5. **Check current migration version**:
+   ```bash
+   DB_URL="postgres://username:password@localhost:5432/quiz_db?sslmode=disable" make migrate-version
+   ```
+
+6. **Go to a specific migration version**:
+   ```bash
+   DB_URL="postgres://username:password@localhost:5432/quiz_db?sslmode=disable" make migrate-goto version=2
+   ```
+
+### Best Practices for Database Migrations
+
+1. **Always create "down" migrations**: Ensure each migration can be reversed.
+2. **Keep migrations small and focused**: One logical change per migration.
+3. **Test migrations before applying to production**: Always verify migrations in a staging environment.
+4. **Include migrations in code reviews**: Treat schema changes with the same rigor as code changes.
+5. **Use transactions when possible**: Wrap schema changes in transactions for atomicity.
+6. **Document complex migrations**: Add comments to explain non-obvious changes.
+
+### Automating Migrations in Deployment
+
+For automatic migrations during deployment, you can add the following to your Dockerfile or deployment script:
+
+```bash
+# Example for a Docker entrypoint
+migrate -path /app/migrations/versioned -database "${DB_URL}" up
+```
+
+Or for docker-compose:
+```yaml
+command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" up && your-app-command"
+```
+
 ## Recent Changes and Current Implementation Status
 
 - ✅ Refactored the user model to separate Users (creators) and Participants
