@@ -21,44 +21,15 @@ import (
 )
 
 func main() {
+	// Load configuration from config files and environment variables
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
 	// Create context with cancellation for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// Load configuration
-	cfg := config.NewConfig()
-
-	// Override config with environment variables if provided
-	if os.Getenv("POSTGRES_HOST") != "" {
-		cfg.Postgres.Host = os.Getenv("POSTGRES_HOST")
-	}
-	if os.Getenv("POSTGRES_PORT") != "" {
-		fmt.Sscanf(os.Getenv("POSTGRES_PORT"), "%d", &cfg.Postgres.Port)
-	}
-	if os.Getenv("POSTGRES_USER") != "" {
-		cfg.Postgres.User = os.Getenv("POSTGRES_USER")
-	}
-	if os.Getenv("POSTGRES_PASSWORD") != "" {
-		cfg.Postgres.Password = os.Getenv("POSTGRES_PASSWORD")
-	}
-	if os.Getenv("POSTGRES_DB") != "" {
-		cfg.Postgres.Database = os.Getenv("POSTGRES_DB")
-	}
-	if os.Getenv("POSTGRES_SSLMODE") != "" {
-		cfg.Postgres.SSLMode = os.Getenv("POSTGRES_SSLMODE")
-	}
-	if os.Getenv("REDIS_HOST") != "" {
-		cfg.Redis.Host = os.Getenv("REDIS_HOST")
-	}
-	if os.Getenv("REDIS_PORT") != "" {
-		fmt.Sscanf(os.Getenv("REDIS_PORT"), "%d", &cfg.Redis.Port)
-	}
-	if os.Getenv("REDIS_PASSWORD") != "" {
-		cfg.Redis.Password = os.Getenv("REDIS_PASSWORD")
-	}
-	if os.Getenv("REDIS_DB") != "" {
-		fmt.Sscanf(os.Getenv("REDIS_DB"), "%d", &cfg.Redis.DB)
-	}
 
 	// Initialize database connection
 	db, err := repository.NewPostgresDB(cfg.Postgres)
@@ -69,9 +40,8 @@ func main() {
 	log.Println("Connected to PostgreSQL database")
 
 	// Initialize Redis client
-	redisAddr := fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port)
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
+		Addr:     cfg.Redis.GetAddr(),
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	})
@@ -170,7 +140,7 @@ func main() {
 		apiV1.GET("/leaderboard/quiz/:quizId", leaderboardHandler.GetLeaderboard)
 	}
 
-	// WebSocket route (updated to specify connection type)
+	// WebSocket route
 	router.GET("/ws/:quizId/:type/:id", wsHandler.HandleConnection)
 
 	// Configure HTTP server
