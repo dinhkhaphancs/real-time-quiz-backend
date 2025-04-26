@@ -74,6 +74,9 @@ type ParticipantRepository interface {
 
 	// GetLeaderboard retrieves the top participants by score for a quiz
 	GetLeaderboard(ctx context.Context, quizID uuid.UUID, limit int) ([]*model.Participant, error)
+
+	// DeleteParticipant removes a participant by ID
+	DeleteParticipant(ctx context.Context, id uuid.UUID) error
 }
 
 // AnswerRepository defines operations for answer management

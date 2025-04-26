@@ -83,6 +83,7 @@ func main() {
 	answerHandler := handler.NewAnswerHandler(answerService)
 	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardService, quizService)
 	wsHandler := handler.NewWebSocketHandler(wsHub, quizService, userService, participantService)
+	participantHandler := handler.NewParticipantHandler(participantService, quizService)
 
 	// Initialize Gin router
 	router := gin.Default()
@@ -138,6 +139,14 @@ func main() {
 
 		// Leaderboard routes
 		apiV1.GET("/leaderboard/quiz/:quizId", leaderboardHandler.GetLeaderboard)
+
+		// Participant routes
+		participantRoutes := apiV1.Group("/participants")
+		{
+			participantRoutes.GET("/:id", participantHandler.GetParticipant)
+			participantRoutes.GET("/quiz/:quizId", participantHandler.GetParticipantsByQuiz)
+			participantRoutes.DELETE("/:id", participantHandler.RemoveParticipant)
+		}
 	}
 
 	// WebSocket route

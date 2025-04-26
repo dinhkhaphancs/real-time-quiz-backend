@@ -1,0 +1,458 @@
+{
+  "info": {
+    "name": "Real-Time Quiz API",
+    "description": "A collection for testing the real-time quiz application API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "register"]
+            },
+            "description": "Register a new user who can create quizzes"
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "login"]
+            },
+            "description": "Login with user credentials"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Quiz Management",
+      "item": [
+        {
+          "name": "Create Quiz",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"General Knowledge Quiz\",\n    \"userId\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/quizzes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "quizzes"]
+            },
+            "description": "Create a new quiz. Use the userId from the registration/login response."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Quiz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "quizzes", "{{quizId}}"]
+            },
+            "description": "Get details of a specific quiz by its ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Start Quiz",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "quizzes", "{{quizId}}", "start"]
+            },
+            "description": "Start a quiz session"
+          },
+          "response": []
+        },
+        {
+          "name": "End Quiz",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}/end",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "quizzes", "{{quizId}}", "end"]
+            },
+            "description": "End a quiz session"
+          },
+          "response": []
+        },
+        {
+          "name": "Join Quiz",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Participant Name\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}/join",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "quizzes", "{{quizId}}", "join"]
+            },
+            "description": "Join a quiz as a participant"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Participant Management",
+      "item": [
+        {
+          "name": "Get Participant",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/participants/{{participantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "participants", "{{participantId}}"]
+            },
+            "description": "Get details of a specific participant"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Participants by Quiz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/participants/quiz/{{quizId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "participants", "quiz", "{{quizId}}"]
+            },
+            "description": "Get all participants for a specific quiz"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Participant",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/participants/{{participantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "participants", "{{participantId}}"]
+            },
+            "description": "Remove a participant from a quiz. This can only be done if the quiz hasn't started yet."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Question Management",
+      "item": [
+        {
+          "name": "Add Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"quizId\": \"{{quizId}}\",\n    \"text\": \"What is the capital of France?\",\n    \"options\": [\n        {\"id\": \"A\", \"text\": \"London\"},\n        {\"id\": \"B\", \"text\": \"Berlin\"},\n        {\"id\": \"C\", \"text\": \"Paris\"},\n        {\"id\": \"D\", \"text\": \"Madrid\"}\n    ],\n    \"correctAnswer\": \"C\",\n    \"timeLimit\": 20\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions"]
+            },
+            "description": "Add a new question to a quiz"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Question",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions", "{{questionId}}"]
+            },
+            "description": "Get details of a specific question"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Questions for Quiz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions/quiz/{{quizId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions", "quiz", "{{quizId}}"]
+            },
+            "description": "Get all questions for a specific quiz"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Next Question",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions/quiz/{{quizId}}/next",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions", "quiz", "{{quizId}}", "next"]
+            },
+            "description": "Get the next active question for a quiz"
+          },
+          "response": []
+        },
+        {
+          "name": "Start Question",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions", "{{questionId}}", "start"]
+            },
+            "description": "Start a specific question in the quiz"
+          },
+          "response": []
+        },
+        {
+          "name": "End Question",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}/end",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions", "{{questionId}}", "end"]
+            },
+            "description": "End a specific question in the quiz"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Answer Management",
+      "item": [
+        {
+          "name": "Submit Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"participantId\": \"{{participantId}}\",\n    \"questionId\": \"{{questionId}}\",\n    \"selectedOption\": \"C\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/answers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "answers"]
+            },
+            "description": "Submit an answer to a question"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Answer Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/answers/question/{{questionId}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "answers", "question", "{{questionId}}", "stats"]
+            },
+            "description": "Get statistics for answers to a specific question"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Participant Answer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/answers/participant/{{participantId}}/question/{{questionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "answers", "participant", "{{participantId}}", "question", "{{questionId}}"]
+            },
+            "description": "Get a specific participant's answer to a question"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leaderboard",
+      "item": [
+        {
+          "name": "Get Leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/leaderboard/quiz/{{quizId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "leaderboard", "quiz", "{{quizId}}"]
+            },
+            "description": "Get the leaderboard for a specific quiz"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "WebSocket Connection",
+      "item": [
+        {
+          "name": "Connect as Quiz Creator",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{wsBaseUrl}}/ws/{{quizId}}/user/{{userId}}",
+              "host": ["{{wsBaseUrl}}"],
+              "path": ["ws", "{{quizId}}", "user", "{{userId}}"]
+            },
+            "description": "Connect to WebSocket as quiz creator. Note that this needs to be tested in a WebSocket client, not directly in Postman."
+          },
+          "response": []
+        },
+        {
+          "name": "Connect as Participant",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{wsBaseUrl}}/ws/{{quizId}}/participant/{{participantId}}",
+              "host": ["{{wsBaseUrl}}"],
+              "path": ["ws", "{{quizId}}", "participant", "{{participantId}}"]
+            },
+            "description": "Connect to WebSocket as participant. Note that this needs to be tested in a WebSocket client, not directly in Postman."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "wsBaseUrl",
+      "value": "ws://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string",
+      "description": "User ID from registration/login response"
+    },
+    {
+      "key": "quizId",
+      "value": "",
+      "type": "string",
+      "description": "Quiz ID from create quiz response"
+    },
+    {
+      "key": "questionId",
+      "value": "",
+      "type": "string",
+      "description": "Question ID from add question response"
+    },
+    {
+      "key": "participantId",
+      "value": "",
+      "type": "string",
+      "description": "Participant ID from join quiz response"
+    }
+  ]
+}

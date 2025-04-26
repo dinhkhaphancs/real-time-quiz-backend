@@ -50,6 +50,9 @@ const (
 	// EventUserJoined is sent when a new user joins
 	EventUserJoined EventType = "USER_JOINED"
 
+	// EventUserLeft is sent when a user leaves the quiz
+	EventUserLeft EventType = "USER_LEFT"
+
 	// EventTimerUpdate is sent to update the remaining time
 	EventTimerUpdate EventType = "TIMER_UPDATE"
 
@@ -166,7 +169,7 @@ func (c *Client) ReadPump() {
 			eventData, _ := json.Marshal(event)
 			c.Send <- eventData
 		case "ANSWER":
-			 // Only participants can submit answers
+			// Only participants can submit answers
 			if c.IsCreator {
 				log.Printf("Creator attempted to submit answer: %s", c.UserID)
 				continue

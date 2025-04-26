@@ -44,7 +44,7 @@ func (r *PostgresParticipantRepository) GetParticipantByID(ctx context.Context, 
 		FROM participants
 		WHERE id = $1
 	`
-	
+
 	var participant model.Participant
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&participant.ID,
@@ -53,14 +53,14 @@ func (r *PostgresParticipantRepository) GetParticipantByID(ctx context.Context, 
 		&participant.Score,
 		&participant.JoinedAt,
 	)
-	
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("participant not found")
 		}
 		return nil, err
 	}
-	
+
 	return &participant, nil
 }
 
@@ -71,13 +71,13 @@ func (r *PostgresParticipantRepository) GetParticipantsByQuizID(ctx context.Cont
 		FROM participants
 		WHERE quiz_id = $1
 	`
-	
+
 	rows, err := r.db.QueryContext(ctx, query, quizID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var participants []*model.Participant
 	for rows.Next() {
 		var participant model.Participant
@@ -92,11 +92,11 @@ func (r *PostgresParticipantRepository) GetParticipantsByQuizID(ctx context.Cont
 		}
 		participants = append(participants, &participant)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	return participants, nil
 }
 
@@ -107,21 +107,21 @@ func (r *PostgresParticipantRepository) UpdateParticipantScore(ctx context.Conte
 		SET score = score + $1
 		WHERE id = $2
 	`
-	
+
 	result, err := r.db.ExecContext(ctx, query, score, participantID)
 	if err != nil {
 		return err
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
-	
+
 	if rowsAffected == 0 {
 		return errors.New("participant not found")
 	}
-	
+
 	return nil
 }
 
@@ -134,13 +134,13 @@ func (r *PostgresParticipantRepository) GetLeaderboard(ctx context.Context, quiz
 		ORDER BY score DESC
 		LIMIT $2
 	`
-	
+
 	rows, err := r.db.QueryContext(ctx, query, quizID, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var participants []*model.Participant
 	for rows.Next() {
 		var participant model.Participant
@@ -155,10 +155,34 @@ func (r *PostgresParticipantRepository) GetLeaderboard(ctx context.Context, quiz
 		}
 		participants = append(participants, &participant)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	return participants, nil
+}
+
+// DeleteParticipant removes a participant by ID
+func (r *PostgresParticipantRepository) DeleteParticipant(ctx context.Context, id uuid.UUID) error {
+	query := `
+		DELETE FROM participants
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("participant not found")
+	}
+
+	return nil
 }

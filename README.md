@@ -241,9 +241,11 @@ sequenceDiagram
 - ✅ Quiz creation and management
 - ✅ Question management
 - ✅ Participant joining
+- ✅ Dedicated participant management API endpoints
 - ✅ Real-time leaderboard updates
 - ✅ Basic quiz flow (waiting, active, completed states)
 - ✅ Role-based WebSocket communication (different events for creators vs participants)
+- ✅ Real-time notifications when participants join or leave
 
 ### Standardized Response Pattern
 
@@ -382,5 +384,4 @@ docker-compose up
 ```
 
 ## API Documentation
-
-API documentation is available at `/swagger/index.html` when running the application.
+See at `real-time-quiz-postman-collection.json`

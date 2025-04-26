@@ -89,4 +89,7 @@ type ParticipantService interface {
 
 	// GetParticipantsByQuizID retrieves all participants for a quiz
 	GetParticipantsByQuizID(ctx context.Context, quizID uuid.UUID) ([]*model.Participant, error)
+
+	// RemoveParticipant removes a participant from a quiz
+	RemoveParticipant(ctx context.Context, id uuid.UUID) error
 }

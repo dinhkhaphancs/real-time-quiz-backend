@@ -98,3 +98,28 @@ func (s *participantServiceImpl) GetParticipantsByQuizID(ctx context.Context, qu
 
 	return participants, nil
 }
+
+// RemoveParticipant removes a participant from a quiz
+func (s *participantServiceImpl) RemoveParticipant(ctx context.Context, id uuid.UUID) error {
+	// First get the participant to broadcast the removal event
+	participant, err := s.participantRepo.GetParticipantByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Delete from repository
+	if err := s.participantRepo.DeleteParticipant(ctx, id); err != nil {
+		return err
+	}
+
+	// Broadcast participant left event
+	s.wsHub.BroadcastToQuiz(participant.QuizID, websocket.Event{
+		Type: websocket.EventUserLeft,
+		Payload: map[string]interface{}{
+			"participantId": id.String(),
+			"name":          participant.Name,
+		},
+	})
+
+	return nil
+}
