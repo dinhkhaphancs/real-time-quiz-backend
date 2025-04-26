@@ -22,14 +22,14 @@ func NewPostgresAnswerRepository(db *DB) *PostgresAnswerRepository {
 // CreateAnswer creates a new answer
 func (r *PostgresAnswerRepository) CreateAnswer(ctx context.Context, answer *model.Answer) error {
 	query := `
-		INSERT INTO answers (id, user_id, question_id, selected_option, answered_at, time_taken, is_correct, score)
+		INSERT INTO answers (id, participant_id, question_id, selected_option, answered_at, time_taken, is_correct, score)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
 		answer.ID,
-		answer.UserID,
+		answer.ParticipantID,
 		answer.QuestionID,
 		answer.SelectedOption,
 		answer.AnsweredAt,
@@ -43,7 +43,7 @@ func (r *PostgresAnswerRepository) CreateAnswer(ctx context.Context, answer *mod
 // GetAnswersByQuestionID retrieves all answers for a question
 func (r *PostgresAnswerRepository) GetAnswersByQuestionID(ctx context.Context, questionID uuid.UUID) ([]*model.Answer, error) {
 	query := `
-		SELECT id, user_id, question_id, selected_option, answered_at, time_taken, is_correct, score
+		SELECT id, participant_id, question_id, selected_option, answered_at, time_taken, is_correct, score
 		FROM answers
 		WHERE question_id = $1
 	`
@@ -59,7 +59,7 @@ func (r *PostgresAnswerRepository) GetAnswersByQuestionID(ctx context.Context, q
 		var answer model.Answer
 		if err := rows.Scan(
 			&answer.ID,
-			&answer.UserID,
+			&answer.ParticipantID,
 			&answer.QuestionID,
 			&answer.SelectedOption,
 			&answer.AnsweredAt,
@@ -79,15 +79,15 @@ func (r *PostgresAnswerRepository) GetAnswersByQuestionID(ctx context.Context, q
 	return answers, nil
 }
 
-// GetAnswersByUserID retrieves all answers for a user
-func (r *PostgresAnswerRepository) GetAnswersByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Answer, error) {
+// GetAnswersByParticipantID retrieves all answers for a participant
+func (r *PostgresAnswerRepository) GetAnswersByParticipantID(ctx context.Context, participantID uuid.UUID) ([]*model.Answer, error) {
 	query := `
-		SELECT id, user_id, question_id, selected_option, answered_at, time_taken, is_correct, score
+		SELECT id, participant_id, question_id, selected_option, answered_at, time_taken, is_correct, score
 		FROM answers
-		WHERE user_id = $1
+		WHERE participant_id = $1
 	`
 	
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, participantID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (r *PostgresAnswerRepository) GetAnswersByUserID(ctx context.Context, userI
 		var answer model.Answer
 		if err := rows.Scan(
 			&answer.ID,
-			&answer.UserID,
+			&answer.ParticipantID,
 			&answer.QuestionID,
 			&answer.SelectedOption,
 			&answer.AnsweredAt,
@@ -118,18 +118,18 @@ func (r *PostgresAnswerRepository) GetAnswersByUserID(ctx context.Context, userI
 	return answers, nil
 }
 
-// GetAnswerByUserAndQuestion retrieves a user's answer for a specific question
-func (r *PostgresAnswerRepository) GetAnswerByUserAndQuestion(ctx context.Context, userID uuid.UUID, questionID uuid.UUID) (*model.Answer, error) {
+// GetAnswerByParticipantAndQuestion retrieves a participant's answer for a specific question
+func (r *PostgresAnswerRepository) GetAnswerByParticipantAndQuestion(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID) (*model.Answer, error) {
 	query := `
-		SELECT id, user_id, question_id, selected_option, answered_at, time_taken, is_correct, score
+		SELECT id, participant_id, question_id, selected_option, answered_at, time_taken, is_correct, score
 		FROM answers
-		WHERE user_id = $1 AND question_id = $2
+		WHERE participant_id = $1 AND question_id = $2
 	`
 	
 	var answer model.Answer
-	err := r.db.QueryRowContext(ctx, query, userID, questionID).Scan(
+	err := r.db.QueryRowContext(ctx, query, participantID, questionID).Scan(
 		&answer.ID,
-		&answer.UserID,
+		&answer.ParticipantID,
 		&answer.QuestionID,
 		&answer.SelectedOption,
 		&answer.AnsweredAt,

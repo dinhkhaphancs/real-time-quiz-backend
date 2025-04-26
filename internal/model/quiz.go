@@ -22,7 +22,7 @@ const (
 type Quiz struct {
 	ID        uuid.UUID  `json:"id" db:"id"`
 	Title     string     `json:"title" db:"title"`
-	AdminID   uuid.UUID  `json:"adminId" db:"admin_id"`
+	CreatorID uuid.UUID  `json:"creatorId" db:"creator_id"`
 	Status    QuizStatus `json:"status" db:"status"`
 	CreatedAt time.Time  `json:"createdAt" db:"created_at"`
 	UpdatedAt time.Time  `json:"updatedAt" db:"updated_at"`
@@ -38,12 +38,12 @@ type QuizSession struct {
 	CurrentQuestionStartedAt *time.Time `json:"currentQuestionStartedAt" db:"current_question_started_at"`
 }
 
-// NewQuiz creates a new quiz with the given title and admin ID
-func NewQuiz(title string, adminID uuid.UUID) *Quiz {
+// NewQuiz creates a new quiz with the given title and creator ID
+func NewQuiz(title string, creatorID uuid.UUID) *Quiz {
 	return &Quiz{
 		ID:        uuid.New(),
 		Title:     title,
-		AdminID:   adminID,
+		CreatorID: creatorID,
 		Status:    QuizStatusWaiting,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),

@@ -10,23 +10,32 @@ import (
 
 // QuizHandler handles quiz-related HTTP requests
 type QuizHandler struct {
-	quizService     service.QuizService
-	questionService service.QuestionService
+	quizService        service.QuizService
+	questionService    service.QuestionService
+	userService        service.UserService
+	participantService service.ParticipantService
 }
 
 // NewQuizHandler creates a new quiz handler
-func NewQuizHandler(quizService service.QuizService, questionService service.QuestionService) *QuizHandler {
+func NewQuizHandler(
+	quizService service.QuizService,
+	questionService service.QuestionService,
+	userService service.UserService,
+	participantService service.ParticipantService,
+) *QuizHandler {
 	return &QuizHandler{
-		quizService:     quizService,
-		questionService: questionService,
+		quizService:        quizService,
+		questionService:    questionService,
+		userService:        userService,
+		participantService: participantService,
 	}
 }
 
-// CreateQuiz handles quiz creation
+// CreateQuiz handles quiz creation by registered users
 func (h *QuizHandler) CreateQuiz(c *gin.Context) {
 	var request struct {
-		Title     string `json:"title" binding:"required"`
-		AdminName string `json:"adminName" binding:"required"`
+		Title  string `json:"title" binding:"required"`
+		UserID string `json:"userId" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -34,7 +43,22 @@ func (h *QuizHandler) CreateQuiz(c *gin.Context) {
 		return
 	}
 
-	quiz, admin, err := h.quizService.CreateQuiz(c, request.Title, request.AdminName)
+	// Parse user ID
+	creatorID, err := uuid.Parse(request.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	// Verify user exists
+	creator, err := h.userService.GetUserByID(c, creatorID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Create the quiz
+	quiz, err := h.quizService.CreateQuiz(c, request.Title, creatorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -42,10 +66,10 @@ func (h *QuizHandler) CreateQuiz(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"quiz": quiz,
-		"admin": map[string]interface{}{
-			"id":   admin.ID,
-			"name": admin.Name,
-			"role": admin.Role,
+		"creator": map[string]interface{}{
+			"id":    creator.ID,
+			"name":  creator.Name,
+			"email": creator.Email,
 		},
 	})
 }
@@ -71,10 +95,14 @@ func (h *QuizHandler) GetQuiz(c *gin.Context) {
 	// Get quiz session
 	session, _ := h.quizService.GetQuizSession(c, id)
 
+	// Get participants for the quiz
+	participants, _ := h.participantService.GetParticipantsByQuizID(c, id)
+
 	c.JSON(http.StatusOK, gin.H{
-		"quiz":      quiz,
-		"questions": questions,
-		"session":   session,
+		"quiz":         quiz,
+		"questions":    questions,
+		"session":      session,
+		"participants": participants,
 	})
 }
 
@@ -112,7 +140,7 @@ func (h *QuizHandler) EndQuiz(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Quiz ended successfully"})
 }
 
-// JoinQuiz allows a user to join a quiz
+// JoinQuiz allows a user to join a quiz as a participant
 func (h *QuizHandler) JoinQuiz(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -130,17 +158,19 @@ func (h *QuizHandler) JoinQuiz(c *gin.Context) {
 		return
 	}
 
-	user, err := h.quizService.JoinQuiz(c, id, request.Name)
+	participant, err := h.participantService.JoinQuiz(c, id, request.Name)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user": map[string]interface{}{
-			"id":   user.ID,
-			"name": user.Name,
-			"role": user.Role,
+		"participant": map[string]interface{}{
+			"id":       participant.ID,
+			"name":     participant.Name,
+			"quizId":   participant.QuizID,
+			"score":    participant.Score,
+			"joinedAt": participant.JoinedAt,
 		},
 	})
 }

@@ -69,6 +69,30 @@ func (h *RedisHub) PublishToQuiz(quizID uuid.UUID, event Event) error {
 	return h.redisClient.Publish(h.ctx, channel, message).Err()
 }
 
+// PublishToCreators publishes an event to Redis and broadcasts only to creator clients
+func (h *RedisHub) PublishToCreators(quizID uuid.UUID, event Event) error {
+	// First publish to Redis to record the event
+	if err := h.PublishToQuiz(quizID, event); err != nil {
+		return err
+	}
+
+	// Then filter and only broadcast to creator clients locally
+	h.BroadcastToCreators(quizID, event)
+	return nil
+}
+
+// PublishToParticipants publishes an event to Redis and broadcasts only to participant clients
+func (h *RedisHub) PublishToParticipants(quizID uuid.UUID, event Event) error {
+	// First publish to Redis to record the event
+	if err := h.PublishToQuiz(quizID, event); err != nil {
+		return err
+	}
+
+	// Then filter and only broadcast to participant clients locally
+	h.BroadcastToParticipants(quizID, event)
+	return nil
+}
+
 // StartTimerBroadcast starts a timer that broadcasts updates to all clients in a quiz
 func (h *RedisHub) StartTimerBroadcast(quizID uuid.UUID, durationSeconds int) {
 	startTime := time.Now()

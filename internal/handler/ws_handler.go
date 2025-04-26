@@ -12,17 +12,24 @@ import (
 
 // WebSocketHandler handles WebSocket connections
 type WebSocketHandler struct {
-	hub         *my_ws.RedisHub
-	quizService service.QuizService
-	userService service.UserService
+	hub                *my_ws.RedisHub
+	quizService        service.QuizService
+	userService        service.UserService
+	participantService service.ParticipantService
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
-func NewWebSocketHandler(hub *my_ws.RedisHub, quizService service.QuizService, userService service.UserService) *WebSocketHandler {
+func NewWebSocketHandler(
+	hub *my_ws.RedisHub,
+	quizService service.QuizService,
+	userService service.UserService,
+	participantService service.ParticipantService,
+) *WebSocketHandler {
 	return &WebSocketHandler{
-		hub:         hub,
-		quizService: quizService,
-		userService: userService,
+		hub:                hub,
+		quizService:        quizService,
+		userService:        userService,
+		participantService: participantService,
 	}
 }
 
@@ -44,18 +51,59 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from the URL
-	userIDStr := c.Param("userId")
-	userID, err := uuid.Parse(userIDStr)
+	// Get connection type and ID from the URL
+	connectionType := c.Param("type") // "user" or "participant"
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
-	// Get user to validate and get role
-	user, err := h.userService.GetUserByID(c, userID, quizID)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found or not authorized for this quiz"})
+	// Variable to track if this is a creator connection
+	isCreator := false
+	userName := ""
+
+	// Validate the connection based on type
+	if connectionType == "user" {
+		// Get user to validate
+		user, err := h.userService.GetUserByID(c, id)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+			return
+		}
+
+		// Check if user is the creator of this quiz
+		quiz, err := h.quizService.GetQuiz(c, quizID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Quiz not found"})
+			return
+		}
+
+		if quiz.CreatorID != user.ID {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not the creator of this quiz"})
+			return
+		}
+
+		isCreator = true
+		userName = user.Name
+
+	} else if connectionType == "participant" {
+		// Get participant to validate
+		participant, err := h.participantService.GetParticipantByID(c, id)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Participant not found"})
+			return
+		}
+
+		if participant.QuizID != quizID {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Participant not authorized for this quiz"})
+			return
+		}
+
+		userName = participant.Name
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid connection type"})
 		return
 	}
 
@@ -71,12 +119,12 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 
 	// Create a new client
 	client := &my_ws.Client{
-		ID:       clientID,
-		UserID:   userID,
-		QuizID:   quizID,
-		UserRole: string(user.Role),
-		Conn:     conn,
-		Send:     make(chan []byte, 256),
+		ID:        clientID,
+		UserID:    id,
+		QuizID:    quizID,
+		IsCreator: isCreator,
+		Conn:      conn,
+		Send:      make(chan []byte, 256),
 	}
 
 	// Subscribe to Redis events for this quiz if not already subscribed
@@ -94,13 +142,14 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	go client.ReadPump()
 	go client.WritePump()
 
-	// Notify other clients about the new connection
-	if user.Role != "ADMIN" {
+	// Notify other clients about the new connection (only for participants)
+	if !isCreator {
 		h.hub.PublishToQuiz(quizID, my_ws.Event{
 			Type: my_ws.EventUserJoined,
 			Payload: map[string]interface{}{
-				"userId":   userID.String(),
-				"userName": user.Name,
+				"id":   id.String(),
+				"name": userName,
+				"type": connectionType,
 			},
 		})
 	}

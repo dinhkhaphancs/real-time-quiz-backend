@@ -99,11 +99,11 @@ type Client struct {
 	// QuizID is the identifier of the quiz this client belongs to
 	QuizID uuid.UUID
 
-	// UserID is the identifier of the user this client belongs to
+	// UserID is the identifier of the user or participant this client belongs to
 	UserID uuid.UUID
 
-	// UserRole is the role of the user (e.g., "ADMIN", "JOINER")
-	UserRole string
+	// IsCreator indicates if this client is connected as a quiz creator (user) or participant
+	IsCreator bool
 
 	// Hub manages the clients
 	Hub HubInterface
@@ -166,6 +166,12 @@ func (c *Client) ReadPump() {
 			eventData, _ := json.Marshal(event)
 			c.Send <- eventData
 		case "ANSWER":
+			 // Only participants can submit answers
+			if c.IsCreator {
+				log.Printf("Creator attempted to submit answer: %s", c.UserID)
+				continue
+			}
+
 			// Process answer submission
 			var answerPayload AnswerPayload
 			if err := json.Unmarshal(incomingMsg.Data, &answerPayload); err != nil {
@@ -185,7 +191,7 @@ func (c *Client) ReadPump() {
 			event := Event{
 				Type: "CLIENT_ANSWER",
 				Payload: map[string]interface{}{
-					"userId":         c.UserID.String(),
+					"participantId":  c.UserID.String(),
 					"questionId":     questionID.String(),
 					"selectedOption": answerPayload.SelectedOption,
 				},

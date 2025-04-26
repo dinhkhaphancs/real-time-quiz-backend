@@ -20,11 +20,11 @@ func NewAnswerHandler(answerService service.AnswerService) *AnswerHandler {
 	}
 }
 
-// SubmitAnswer handles user answer submissions
+// SubmitAnswer handles participant answer submissions
 func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	var request struct {
-		UserID        string `json:"userId" binding:"required"`
-		QuestionID    string `json:"questionId" binding:"required"`
+		ParticipantID  string `json:"participantId" binding:"required"`
+		QuestionID     string `json:"questionId" binding:"required"`
 		SelectedOption string `json:"selectedOption" binding:"required"`
 	}
 
@@ -34,9 +34,9 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	}
 
 	// Parse UUIDs
-	userID, err := uuid.Parse(request.UserID)
+	participantID, err := uuid.Parse(request.ParticipantID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid participant ID"})
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	}
 
 	// Submit the answer
-	answer, err := h.answerService.SubmitAnswer(c, userID, questionID, request.SelectedOption)
+	answer, err := h.answerService.SubmitAnswer(c, participantID, questionID, request.SelectedOption)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -81,14 +81,14 @@ func (h *AnswerHandler) GetAnswerStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"stats": stats})
 }
 
-// GetUserAnswer retrieves a specific user's answer
-func (h *AnswerHandler) GetUserAnswer(c *gin.Context) {
-	userIDStr := c.Param("userId")
+// GetParticipantAnswer retrieves a specific participant's answer
+func (h *AnswerHandler) GetParticipantAnswer(c *gin.Context) {
+	participantIDStr := c.Param("participantId")
 	questionIDStr := c.Param("questionId")
 
-	userID, err := uuid.Parse(userIDStr)
+	participantID, err := uuid.Parse(participantIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid participant ID"})
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *AnswerHandler) GetUserAnswer(c *gin.Context) {
 		return
 	}
 
-	answer, err := h.answerService.GetUserAnswer(c, userID, questionID)
+	answer, err := h.answerService.GetParticipantAnswer(c, participantID, questionID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

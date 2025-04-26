@@ -10,50 +10,50 @@ import (
 	"github.com/google/uuid"
 )
 
-// answerService implements AnswerService interface
-type answerService struct {
-	answerRepo   repository.AnswerRepository
-	questionRepo repository.QuestionRepository
-	userRepo     repository.UserRepository
-	wsHub        *websocket.RedisHub
+// answerServiceImpl implements AnswerService interface
+type answerServiceImpl struct {
+	answerRepo      repository.AnswerRepository
+	questionRepo    repository.QuestionRepository
+	participantRepo repository.ParticipantRepository
+	wsHub           *websocket.RedisHub
 }
 
 // NewAnswerService creates a new answer service
 func NewAnswerService(
 	answerRepo repository.AnswerRepository,
 	questionRepo repository.QuestionRepository,
-	userRepo repository.UserRepository,
+	participantRepo repository.ParticipantRepository,
 	wsHub *websocket.RedisHub,
 ) AnswerService {
-	return &answerService{
-		answerRepo:   answerRepo,
-		questionRepo: questionRepo,
-		userRepo:     userRepo,
-		wsHub:        wsHub,
+	return &answerServiceImpl{
+		answerRepo:      answerRepo,
+		questionRepo:    questionRepo,
+		participantRepo: participantRepo,
+		wsHub:           wsHub,
 	}
 }
 
-// SubmitAnswer records a user's answer to a question
-func (s *answerService) SubmitAnswer(ctx context.Context, userID uuid.UUID, questionID uuid.UUID, selectedOption string) (*model.Answer, error) {
+// SubmitAnswer records a participant's answer to a question
+func (s *answerServiceImpl) SubmitAnswer(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID, selectedOption string) (*model.Answer, error) {
 	// Validate option format
 	if selectedOption != "A" && selectedOption != "B" && selectedOption != "C" && selectedOption != "D" {
-		return nil, ErrInvalidOption
+		return nil, errors.New("invalid option selected")
 	}
 
-	// Check if user exists
-	user, err := s.userRepo.GetUserByID(ctx, userID)
+	// Check if participant exists
+	participant, err := s.participantRepo.GetParticipantByID(ctx, participantID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("participant not found")
 	}
 
 	// Get the question
 	question, err := s.questionRepo.GetQuestionByID(ctx, questionID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("question not found")
 	}
 
 	// Check if answer already submitted
-	existingAnswer, err := s.answerRepo.GetAnswerByUserAndQuestion(ctx, userID, questionID)
+	existingAnswer, err := s.answerRepo.GetAnswerByParticipantAndQuestion(ctx, participantID, questionID)
 	if err == nil && existingAnswer != nil {
 		return nil, errors.New("answer already submitted")
 	}
@@ -74,7 +74,7 @@ func (s *answerService) SubmitAnswer(ctx context.Context, userID uuid.UUID, ques
 	}
 
 	// Create answer record
-	answer := model.NewAnswer(userID, questionID, selectedOption, timeTaken, isCorrect)
+	answer := model.NewAnswer(participantID, questionID, selectedOption, timeTaken, isCorrect)
 	answer.Score = score
 
 	// Save to database
@@ -82,13 +82,13 @@ func (s *answerService) SubmitAnswer(ctx context.Context, userID uuid.UUID, ques
 		return nil, err
 	}
 
-	// Update user's total score
-	if err := s.userRepo.UpdateUserScore(ctx, userID, score); err != nil {
+	// Update participant's total score
+	if err := s.participantRepo.UpdateParticipantScore(ctx, participantID, score); err != nil {
 		return nil, err
 	}
 
-	// Notify user of answer receipt
-	s.wsHub.SendToClient(uuid.New(), user.QuizID, websocket.Event{
+	// Notify participant of answer receipt
+	s.wsHub.SendToClient(participantID, participant.QuizID, websocket.Event{
 		Type: websocket.EventAnswerReceived,
 		Payload: map[string]interface{}{
 			"questionId":     questionID.String(),
@@ -102,7 +102,7 @@ func (s *answerService) SubmitAnswer(ctx context.Context, userID uuid.UUID, ques
 }
 
 // GetAnswerStats retrieves statistics for answers to a question
-func (s *answerService) GetAnswerStats(ctx context.Context, questionID uuid.UUID) (map[string]int, error) {
+func (s *answerServiceImpl) GetAnswerStats(ctx context.Context, questionID uuid.UUID) (map[string]int, error) {
 	// Get all answers for the question
 	answers, err := s.answerRepo.GetAnswersByQuestionID(ctx, questionID)
 	if err != nil {
@@ -124,9 +124,9 @@ func (s *answerService) GetAnswerStats(ctx context.Context, questionID uuid.UUID
 	return stats, nil
 }
 
-// GetUserAnswer retrieves a user's answer to a specific question
-func (s *answerService) GetUserAnswer(ctx context.Context, userID uuid.UUID, questionID uuid.UUID) (*model.Answer, error) {
-	answer, err := s.answerRepo.GetAnswerByUserAndQuestion(ctx, userID, questionID)
+// GetParticipantAnswer retrieves a participant's answer to a specific question
+func (s *answerServiceImpl) GetParticipantAnswer(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID) (*model.Answer, error) {
+	answer, err := s.answerRepo.GetAnswerByParticipantAndQuestion(ctx, participantID, questionID)
 	if err != nil {
 		return nil, err
 	}

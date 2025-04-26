@@ -9,59 +9,70 @@ import (
 	"github.com/google/uuid"
 )
 
-// UserServiceImpl implements UserService interface
-type UserServiceImpl struct {
+// userServiceImpl implements UserService interface
+type userServiceImpl struct {
 	userRepo repository.UserRepository
-	quizRepo repository.QuizRepository
 }
 
 // NewUserService creates a new user service
-func NewUserService(userRepo repository.UserRepository, quizRepo repository.QuizRepository) *UserServiceImpl {
-	return &UserServiceImpl{
+func NewUserService(userRepo repository.UserRepository) UserService {
+	return &userServiceImpl{
 		userRepo: userRepo,
-		quizRepo: quizRepo,
 	}
 }
 
-// GetUserByID retrieves a user by ID and validates quiz access
-func (s *UserServiceImpl) GetUserByID(ctx context.Context, userID uuid.UUID, quizID uuid.UUID) (*model.User, error) {
-	user, err := s.userRepo.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, err
+// Register creates a new user account
+func (s *userServiceImpl) Register(ctx context.Context, name string, email string, password string) (*model.User, error) {
+	// Validate inputs
+	if name == "" {
+		return nil, errors.New("name is required")
+	}
+	if email == "" {
+		return nil, errors.New("email is required")
+	}
+	if password == "" {
+		return nil, errors.New("password is required")
 	}
 
-	// Validate that the user belongs to the requested quiz
-	if user.QuizID != quizID {
-		return nil, errors.New("user does not belong to this quiz")
+	// Check if email is already registered
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, email)
+	if err == nil && existingUser != nil {
+		return nil, errors.New("email is already registered")
+	}
+
+	// Create new user
+	user, err := model.NewUser(name, email, password)
+	if err != nil {
+		return nil, errors.New("failed to create user: " + err.Error())
+	}
+
+	// Save to repository
+	if err := s.userRepo.CreateUser(ctx, user); err != nil {
+		return nil, err
 	}
 
 	return user, nil
 }
 
-// CreateUser creates a new user
-func (s *UserServiceImpl) CreateUser(ctx context.Context, quizID uuid.UUID, name string, role string) (*model.User, error) {
-	// Validate quiz exists
-	_, err := s.quizRepo.GetQuizByID(ctx, quizID)
+// Login authenticates a user and returns user data
+func (s *userServiceImpl) Login(ctx context.Context, email string, password string) (*model.User, error) {
+	// Get user by email
+	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, errors.New("quiz not found")
+		return nil, errors.New("invalid email or password")
 	}
 
-	// Validate role
-	var userRole model.UserRole
-	switch role {
-	case string(model.UserRoleAdmin):
-		userRole = model.UserRoleAdmin
-	case string(model.UserRoleJoiner):
-		userRole = model.UserRoleJoiner
-	default:
-		return nil, errors.New("invalid user role")
+	// Verify password
+	if !user.ComparePassword(password) {
+		return nil, errors.New("invalid email or password")
 	}
 
-	// Create new user
-	user := model.NewUser(name, quizID, userRole)
+	return user, nil
+}
 
-	// Save to repository
-	err = s.userRepo.CreateUser(ctx, user)
+// GetUserByID retrieves a user by ID
+func (s *userServiceImpl) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	user, err := s.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}

@@ -16,12 +16,10 @@ var (
 	ErrQuizNotFound       = errors.New("quiz not found")
 	ErrQuizAlreadyStarted = errors.New("quiz has already started")
 	ErrQuizNotActive      = errors.New("quiz is not active")
-	ErrNameTaken          = errors.New("name is already taken")
-	ErrNameRequired       = errors.New("name is required")
 )
 
-// quizService implements QuizService interface
-type quizService struct {
+// quizServiceImpl implements QuizService interface
+type quizServiceImpl struct {
 	quizRepo     repository.QuizRepository
 	userRepo     repository.UserRepository
 	questionRepo repository.QuestionRepository
@@ -35,7 +33,7 @@ func NewQuizService(
 	questionRepo repository.QuestionRepository,
 	wsHub *websocket.RedisHub,
 ) QuizService {
-	return &quizService{
+	return &quizServiceImpl{
 		quizRepo:     quizRepo,
 		userRepo:     userRepo,
 		questionRepo: questionRepo,
@@ -43,44 +41,37 @@ func NewQuizService(
 	}
 }
 
-// CreateQuiz creates a new quiz with an admin user
-func (s *quizService) CreateQuiz(ctx context.Context, title string, adminName string) (*model.Quiz, *model.User, error) {
+// CreateQuiz creates a new quiz with the specified creator
+func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, creatorID uuid.UUID) (*model.Quiz, error) {
 	if title == "" {
-		return nil, nil, errors.New("title is required")
-	}
-	if adminName == "" {
-		return nil, nil, ErrNameRequired
+		return nil, errors.New("title is required")
 	}
 
-	// Create a new admin user first with a temporary quiz ID
-	tempID := uuid.New()
-	admin := model.NewAdmin(adminName, tempID)
+	// Verify user exists
+	creator, err := s.userRepo.GetUserByID(ctx, creatorID)
+	if err != nil {
+		return nil, errors.New("creator not found")
+	}
 
 	// Create the quiz
-	quiz := model.NewQuiz(title, admin.ID)
-
-	// Update the admin's quiz ID to the actual quiz ID
-	admin.QuizID = quiz.ID
+	quiz := model.NewQuiz(title, creator.ID)
 
 	// Create quiz session
 	session := model.NewQuizSession(quiz.ID)
 
 	// Save to database
 	if err := s.quizRepo.CreateQuiz(ctx, quiz); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if err := s.quizRepo.CreateQuizSession(ctx, session); err != nil {
-		return nil, nil, err
-	}
-	if err := s.userRepo.CreateUser(ctx, admin); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return quiz, admin, nil
+	return quiz, nil
 }
 
 // GetQuiz retrieves a quiz by ID
-func (s *quizService) GetQuiz(ctx context.Context, id uuid.UUID) (*model.Quiz, error) {
+func (s *quizServiceImpl) GetQuiz(ctx context.Context, id uuid.UUID) (*model.Quiz, error) {
 	quiz, err := s.quizRepo.GetQuizByID(ctx, id)
 	if err != nil {
 		return nil, ErrQuizNotFound
@@ -89,7 +80,7 @@ func (s *quizService) GetQuiz(ctx context.Context, id uuid.UUID) (*model.Quiz, e
 }
 
 // StartQuiz starts a quiz session
-func (s *quizService) StartQuiz(ctx context.Context, quizID uuid.UUID) error {
+func (s *quizServiceImpl) StartQuiz(ctx context.Context, quizID uuid.UUID) error {
 	// Get the quiz and session
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -132,7 +123,7 @@ func (s *quizService) StartQuiz(ctx context.Context, quizID uuid.UUID) error {
 }
 
 // EndQuiz ends a quiz session
-func (s *quizService) EndQuiz(ctx context.Context, quizID uuid.UUID) error {
+func (s *quizServiceImpl) EndQuiz(ctx context.Context, quizID uuid.UUID) error {
 	// Get the quiz and session
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -173,57 +164,8 @@ func (s *quizService) EndQuiz(ctx context.Context, quizID uuid.UUID) error {
 	return nil
 }
 
-// JoinQuiz allows a user to join a quiz
-func (s *quizService) JoinQuiz(ctx context.Context, quizID uuid.UUID, name string) (*model.User, error) {
-	if name == "" {
-		return nil, ErrNameRequired
-	}
-
-	// Get the quiz
-	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
-	if err != nil {
-		return nil, ErrQuizNotFound
-	}
-
-	// Ensure quiz is in WAITING state
-	if quiz.Status != model.QuizStatusWaiting {
-		return nil, errors.New("cannot join a quiz that has already started")
-	}
-
-	// Check if name is already taken in this quiz
-	users, err := s.userRepo.GetUsersByQuizID(ctx, quizID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, user := range users {
-		if user.Name == name {
-			return nil, ErrNameTaken
-		}
-	}
-
-	// Create new joiner
-	joiner := model.NewJoiner(name, quizID)
-
-	// Save to database
-	if err := s.userRepo.CreateUser(ctx, joiner); err != nil {
-		return nil, err
-	}
-
-	// Broadcast user joined event
-	s.wsHub.BroadcastToQuiz(quizID, websocket.Event{
-		Type: websocket.EventUserJoined,
-		Payload: map[string]interface{}{
-			"userId": joiner.ID.String(),
-			"name":   joiner.Name,
-		},
-	})
-
-	return joiner, nil
-}
-
 // GetQuizSession retrieves the current state of a quiz
-func (s *quizService) GetQuizSession(ctx context.Context, quizID uuid.UUID) (*model.QuizSession, error) {
+func (s *quizServiceImpl) GetQuizSession(ctx context.Context, quizID uuid.UUID) (*model.QuizSession, error) {
 	session, err := s.quizRepo.GetQuizSession(ctx, quizID)
 	if err != nil {
 		return nil, err

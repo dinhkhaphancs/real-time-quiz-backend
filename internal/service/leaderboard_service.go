@@ -9,71 +9,71 @@ import (
 	"github.com/google/uuid"
 )
 
-// leaderboardService implements LeaderboardService interface
-type leaderboardService struct {
-	userRepo repository.UserRepository
-	wsHub    *websocket.RedisHub
+// leaderboardServiceImpl implements LeaderboardService interface
+type leaderboardServiceImpl struct {
+	participantRepo repository.ParticipantRepository
+	wsHub           *websocket.RedisHub
 }
 
 // NewLeaderboardService creates a new leaderboard service
 func NewLeaderboardService(
-	userRepo repository.UserRepository,
+	participantRepo repository.ParticipantRepository,
 	wsHub *websocket.RedisHub,
 ) LeaderboardService {
-	return &leaderboardService{
-		userRepo: userRepo,
-		wsHub:    wsHub,
+	return &leaderboardServiceImpl{
+		participantRepo: participantRepo,
+		wsHub:           wsHub,
 	}
 }
 
-// GetLeaderboard retrieves the top users by score
-func (s *leaderboardService) GetLeaderboard(ctx context.Context, quizID uuid.UUID, limit int) ([]*model.User, error) {
+// GetLeaderboard retrieves the top participants by score
+func (s *leaderboardServiceImpl) GetLeaderboard(ctx context.Context, quizID uuid.UUID, limit int) ([]*model.Participant, error) {
 	// If limit is not specified or is invalid, set a default
 	if limit <= 0 {
 		limit = 10
 	}
 
-	// Get users sorted by score
-	users, err := s.userRepo.GetLeaderboard(ctx, quizID, limit)
+	// Get participants sorted by score
+	participants, err := s.participantRepo.GetLeaderboard(ctx, quizID, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	return users, nil
+	return participants, nil
 }
 
-// UpdateUserScore updates a user's total score and broadcasts the updated leaderboard
-func (s *leaderboardService) UpdateUserScore(ctx context.Context, userID uuid.UUID, additionalScore int) error {
-	// Update the user's score
-	if err := s.userRepo.UpdateUserScore(ctx, userID, additionalScore); err != nil {
+// UpdateParticipantScore updates a participant's total score and broadcasts the updated leaderboard
+func (s *leaderboardServiceImpl) UpdateParticipantScore(ctx context.Context, participantID uuid.UUID, additionalScore int) error {
+	// Update the participant's score
+	if err := s.participantRepo.UpdateParticipantScore(ctx, participantID, additionalScore); err != nil {
 		return err
 	}
 
-	// Get the user to determine the quiz ID
-	user, err := s.userRepo.GetUserByID(ctx, userID)
+	// Get the participant to determine the quiz ID
+	participant, err := s.participantRepo.GetParticipantByID(ctx, participantID)
 	if err != nil {
 		return err
 	}
 
 	// Get the updated leaderboard
-	leaderboard, err := s.GetLeaderboard(ctx, user.QuizID, 10)
+	leaderboard, err := s.GetLeaderboard(ctx, participant.QuizID, 10)
 	if err != nil {
 		return err
 	}
 
 	// Prepare leaderboard data for broadcasting
 	var leaderboardData []map[string]interface{}
-	for i, user := range leaderboard {
+	for i, participant := range leaderboard {
 		leaderboardData = append(leaderboardData, map[string]interface{}{
 			"rank":  i + 1,
-			"id":    user.ID.String(),
-			"name":  user.Name,
-			"score": user.Score,
+			"id":    participant.ID.String(),
+			"name":  participant.Name,
+			"score": participant.Score,
 		})
 	}
 
 	// Broadcast updated leaderboard to all clients in the quiz
-	s.wsHub.BroadcastToQuiz(user.QuizID, websocket.Event{
+	s.wsHub.BroadcastToQuiz(participant.QuizID, websocket.Event{
 		Type: websocket.EventLeaderboardUpdate,
 		Payload: map[string]interface{}{
 			"leaderboard": leaderboardData,

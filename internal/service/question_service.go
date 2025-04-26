@@ -143,22 +143,30 @@ func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, q
 		return err
 	}
 
-	// Different payloads for admin and joiners
-	// For admin, send full question details
-	s.wsHub.BroadcastToAdmin(quizID, websocket.Event{
+	// Get total question count for better UI experience
+	questions, err := s.questionRepo.GetQuestionsByQuizID(ctx, quizID)
+	if err != nil {
+		// Non-critical error, we can continue with approximate count
+		questions = []*model.Question{question}
+	}
+	totalCount := len(questions)
+
+	// Different payloads for creators and participants
+	// For creators (quiz admins), send full question details
+	s.wsHub.PublishToCreators(quizID, websocket.Event{
 		Type: websocket.EventQuestionStart,
 		Payload: map[string]interface{}{
-			"questionId":   question.ID.String(),
-			"text":         question.Text,
-			"options":      question.GetOptions(),
-			"timeLimit":    question.TimeLimit,
-			"order":        question.Order,
-			"totalCount":   question.Order, // We need to get the total count in a real implementation
+			"questionId": question.ID.String(),
+			"text":       question.Text,
+			"options":    question.GetOptions(),
+			"timeLimit":  question.TimeLimit,
+			"order":      question.Order,
+			"totalCount": totalCount,
 		},
 	})
 
-	// For joiners, send only options (no text, no correct answer)
-	s.wsHub.BroadcastToJoiners(quizID, websocket.Event{
+	// For participants, send options without text and correct answer
+	s.wsHub.PublishToParticipants(quizID, websocket.Event{
 		Type: websocket.EventQuestionStart,
 		Payload: map[string]interface{}{
 			"questionId": question.ID.String(),
@@ -170,7 +178,7 @@ func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, q
 			},
 			"timeLimit":  question.TimeLimit,
 			"order":      question.Order,
-			"totalCount": question.Order, // We need to get the total count in a real implementation
+			"totalCount": totalCount,
 		},
 	})
 
@@ -181,7 +189,7 @@ func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, q
 	go func() {
 		timer := time.NewTimer(time.Duration(question.TimeLimit) * time.Second)
 		<-timer.C
-		
+
 		// End the question automatically
 		if err := s.EndQuestion(context.Background(), quizID); err != nil {
 			// Log the error but don't stop execution
@@ -273,7 +281,7 @@ func (s *questionService) GetNextQuestion(ctx context.Context, quizID uuid.UUID)
 				return q, nil
 			}
 		}
-		
+
 		// If no question with order 1, return the first in the list
 		return questions[0], nil
 	}

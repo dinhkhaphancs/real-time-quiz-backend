@@ -6,10 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// Answer represents a user's answer to a question
+// Answer represents a participant's answer to a question
 type Answer struct {
 	ID             uuid.UUID `json:"id" db:"id"`
-	UserID         uuid.UUID `json:"userId" db:"user_id"`
+	ParticipantID  uuid.UUID `json:"participantId" db:"participant_id"` // Changed from UserID to ParticipantID
 	QuestionID     uuid.UUID `json:"questionId" db:"question_id"`
 	SelectedOption string    `json:"selectedOption" db:"selected_option"` // A, B, C, or D
 	AnsweredAt     time.Time `json:"answeredAt" db:"answered_at"`
@@ -19,7 +19,7 @@ type Answer struct {
 }
 
 // NewAnswer creates a new answer record
-func NewAnswer(userID, questionID uuid.UUID, selectedOption string, timeTaken float64, isCorrect bool) *Answer {
+func NewAnswer(participantID, questionID uuid.UUID, selectedOption string, timeTaken float64, isCorrect bool) *Answer {
 	score := 0
 	if isCorrect {
 		score = 100
@@ -27,7 +27,7 @@ func NewAnswer(userID, questionID uuid.UUID, selectedOption string, timeTaken fl
 
 	return &Answer{
 		ID:             uuid.New(),
-		UserID:         userID,
+		ParticipantID:  participantID,
 		QuestionID:     questionID,
 		SelectedOption: selectedOption,
 		AnsweredAt:     time.Now(),

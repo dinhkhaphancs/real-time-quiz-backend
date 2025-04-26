@@ -3,11 +3,20 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+
 -- Quizzes table
 CREATE TABLE IF NOT EXISTS quizzes (
     id UUID PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    admin_id UUID NOT NULL,
+    creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(20) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
@@ -39,27 +48,26 @@ CREATE TABLE IF NOT EXISTS questions (
     updated_at TIMESTAMP NOT NULL
 );
 
--- Users table
-CREATE TABLE IF NOT EXISTS users (
+-- Participants table
+CREATE TABLE IF NOT EXISTS participants (
     id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-    role VARCHAR(20) NOT NULL,
-    joined_at TIMESTAMP NOT NULL,
-    score INTEGER NOT NULL DEFAULT 0
+    score INTEGER NOT NULL DEFAULT 0,
+    joined_at TIMESTAMP NOT NULL
 );
 
 -- Answers table
 CREATE TABLE IF NOT EXISTS answers (
     id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
     question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     selected_option CHAR(1) NOT NULL,
     answered_at TIMESTAMP NOT NULL,
     time_taken FLOAT NOT NULL,
     is_correct BOOLEAN NOT NULL,
     score INTEGER NOT NULL,
-    UNIQUE(user_id, question_id)
+    UNIQUE(participant_id, question_id)
 );
 
 -- Add foreign key constraint for current_question_id

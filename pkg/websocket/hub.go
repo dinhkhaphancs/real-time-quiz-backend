@@ -106,8 +106,8 @@ func (h *Hub) BroadcastToQuiz(quizID uuid.UUID, event Event) {
 	}
 }
 
-// BroadcastToAdmin sends an event only to admin clients in a quiz
-func (h *Hub) BroadcastToAdmin(quizID uuid.UUID, event Event) {
+// BroadcastToCreators sends an event only to creator clients in a quiz
+func (h *Hub) BroadcastToCreators(quizID uuid.UUID, event Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -123,7 +123,7 @@ func (h *Hub) BroadcastToAdmin(quizID uuid.UUID, event Event) {
 	}
 
 	for _, client := range quizClients {
-		if client.UserRole != "ADMIN" {
+		if !client.IsCreator {
 			continue
 		}
 
@@ -136,8 +136,8 @@ func (h *Hub) BroadcastToAdmin(quizID uuid.UUID, event Event) {
 	}
 }
 
-// BroadcastToJoiners sends an event only to joiner clients in a quiz
-func (h *Hub) BroadcastToJoiners(quizID uuid.UUID, event Event) {
+// BroadcastToParticipants sends an event only to participant clients in a quiz
+func (h *Hub) BroadcastToParticipants(quizID uuid.UUID, event Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -153,7 +153,7 @@ func (h *Hub) BroadcastToJoiners(quizID uuid.UUID, event Event) {
 	}
 
 	for _, client := range quizClients {
-		if client.UserRole != "JOINER" {
+		if client.IsCreator {
 			continue
 		}
 
@@ -167,7 +167,7 @@ func (h *Hub) BroadcastToJoiners(quizID uuid.UUID, event Event) {
 }
 
 // SendToClient sends an event to a specific client
-func (h *Hub) SendToClient(clientID uuid.UUID, quizID uuid.UUID, event Event) {
+func (h *Hub) SendToClient(userID uuid.UUID, quizID uuid.UUID, event Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -176,8 +176,16 @@ func (h *Hub) SendToClient(clientID uuid.UUID, quizID uuid.UUID, event Event) {
 		return
 	}
 
-	client, exists := quizClients[clientID]
-	if !exists {
+	// Find the client with the matching UserID
+	var targetClient *Client
+	for _, client := range quizClients {
+		if client.UserID == userID {
+			targetClient = client
+			break
+		}
+	}
+
+	if targetClient == nil {
 		return
 	}
 
@@ -188,10 +196,10 @@ func (h *Hub) SendToClient(clientID uuid.UUID, quizID uuid.UUID, event Event) {
 	}
 
 	select {
-	case client.Send <- message:
+	case targetClient.Send <- message:
 	default:
-		close(client.Send)
-		delete(quizClients, client.ID)
+		close(targetClient.Send)
+		delete(quizClients, targetClient.ID)
 	}
 }
 

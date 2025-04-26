@@ -4,46 +4,36 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// UserRole represents the role of a user in a quiz
-type UserRole string
-
-const (
-	// UserRoleAdmin represents an admin user who creates and manages quizzes
-	UserRoleAdmin UserRole = "ADMIN"
-	// UserRoleJoiner represents a user who joins and participates in quizzes
-	UserRoleJoiner UserRole = "JOINER"
-)
-
-// User represents a user in the system
+// User represents a registered user who can create and manage quizzes
 type User struct {
-	ID       uuid.UUID `json:"id" db:"id"`
-	Name     string    `json:"name" db:"name"`
-	QuizID   uuid.UUID `json:"quizId" db:"quiz_id"`
-	Role     UserRole  `json:"role" db:"role"`
-	JoinedAt time.Time `json:"joinedAt" db:"joined_at"`
-	Score    int       `json:"score" db:"score"`
+	ID           uuid.UUID `json:"id" db:"id"`
+	Name         string    `json:"name" db:"name"`
+	Email        string    `json:"email" db:"email"`
+	PasswordHash string    `json:"-" db:"password_hash"`
+	CreatedAt    time.Time `json:"createdAt" db:"created_at"`
 }
 
 // NewUser creates a new user with the given details
-func NewUser(name string, quizID uuid.UUID, role UserRole) *User {
-	return &User{
-		ID:       uuid.New(),
-		Name:     name,
-		QuizID:   quizID,
-		Role:     role,
-		JoinedAt: time.Now(),
-		Score:    0,
+func NewUser(name string, email string, password string) (*User, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
 	}
+
+	return &User{
+		ID:           uuid.New(),
+		Name:         name,
+		Email:        email,
+		PasswordHash: string(hashedPassword),
+		CreatedAt:    time.Now(),
+	}, nil
 }
 
-// NewAdmin creates a new admin user
-func NewAdmin(name string, quizID uuid.UUID) *User {
-	return NewUser(name, quizID, UserRoleAdmin)
-}
-
-// NewJoiner creates a new joiner user
-func NewJoiner(name string, quizID uuid.UUID) *User {
-	return NewUser(name, quizID, UserRoleJoiner)
+// ComparePassword checks if the provided password matches the stored hash
+func (u *User) ComparePassword(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	return err == nil
 }

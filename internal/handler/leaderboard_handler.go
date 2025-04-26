@@ -37,7 +37,7 @@ func (h *LeaderboardHandler) GetLeaderboard(c *gin.Context) {
 		limit = 10
 	}
 
-	users, err := h.leaderboardService.GetLeaderboard(c, quizID, limit)
+	participants, err := h.leaderboardService.GetLeaderboard(c, quizID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -45,13 +45,13 @@ func (h *LeaderboardHandler) GetLeaderboard(c *gin.Context) {
 
 	// Format response
 	var leaderboardEntries []map[string]interface{}
-	for i, user := range users {
+	for i, participant := range participants {
 		leaderboardEntries = append(leaderboardEntries, map[string]interface{}{
 			"rank":     i + 1,
-			"id":       user.ID,
-			"name":     user.Name,
-			"score":    user.Score,
-			"joinedAt": user.JoinedAt,
+			"id":       participant.ID,
+			"name":     participant.Name,
+			"score":    participant.Score,
+			"joinedAt": participant.JoinedAt,
 		})
 	}
 

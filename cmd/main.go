@@ -17,7 +17,7 @@ import (
 	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/websocket"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8" // Add Redis client import
+	"github.com/go-redis/redis/v8"
 )
 
 func main() {
@@ -95,21 +95,24 @@ func main() {
 	quizRepo := repository.NewPostgresQuizRepository(db)
 	questionRepo := repository.NewPostgresQuestionRepository(db)
 	userRepo := repository.NewPostgresUserRepository(db)
+	participantRepo := repository.NewPostgresParticipantRepository(db)
 	answerRepo := repository.NewPostgresAnswerRepository(db)
 
 	// Initialize services
+	userService := service.NewUserService(userRepo)
+	participantService := service.NewParticipantService(participantRepo, quizRepo, wsHub)
 	quizService := service.NewQuizService(quizRepo, userRepo, questionRepo, wsHub)
 	questionService := service.NewQuestionService(quizRepo, questionRepo, wsHub)
-	answerService := service.NewAnswerService(answerRepo, questionRepo, userRepo, wsHub)
-	leaderboardService := service.NewLeaderboardService(userRepo, wsHub)
-	userService := service.NewUserService(userRepo, quizRepo)
+	answerService := service.NewAnswerService(answerRepo, questionRepo, participantRepo, wsHub)
+	leaderboardService := service.NewLeaderboardService(participantRepo, wsHub)
 
 	// Initialize handlers
-	quizHandler := handler.NewQuizHandler(quizService, questionService)
+	userHandler := handler.NewUserHandler(userService)
+	quizHandler := handler.NewQuizHandler(quizService, questionService, userService, participantService)
 	questionHandler := handler.NewQuestionHandler(questionService)
 	answerHandler := handler.NewAnswerHandler(answerService)
 	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardService)
-	wsHandler := handler.NewWebSocketHandler(wsHub, quizService, userService)
+	wsHandler := handler.NewWebSocketHandler(wsHub, quizService, userService, participantService)
 
 	// Initialize Gin router
 	router := gin.Default()
@@ -127,6 +130,13 @@ func main() {
 	// API routes
 	apiV1 := router.Group("/api/v1")
 	{
+		// User routes
+		userRoutes := apiV1.Group("/users")
+		{
+			userRoutes.POST("/register", userHandler.RegisterUser)
+			userRoutes.POST("/login", userHandler.LoginUser)
+		}
+
 		// Quiz routes
 		quizRoutes := apiV1.Group("/quizzes")
 		{
@@ -153,15 +163,15 @@ func main() {
 		{
 			answerRoutes.POST("", answerHandler.SubmitAnswer)
 			answerRoutes.GET("/question/:questionId/stats", answerHandler.GetAnswerStats)
-			answerRoutes.GET("/user/:userId/question/:questionId", answerHandler.GetUserAnswer)
+			answerRoutes.GET("/participant/:participantId/question/:questionId", answerHandler.GetParticipantAnswer)
 		}
 
 		// Leaderboard routes
 		apiV1.GET("/leaderboard/quiz/:quizId", leaderboardHandler.GetLeaderboard)
 	}
 
-	// WebSocket route
-	router.GET("/ws/:quizId/:userId", wsHandler.HandleConnection)
+	// WebSocket route (updated to specify connection type)
+	router.GET("/ws/:quizId/:type/:id", wsHandler.HandleConnection)
 
 	// Configure HTTP server
 	server := &http.Server{
