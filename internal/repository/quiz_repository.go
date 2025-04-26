@@ -23,8 +23,8 @@ func NewPostgresQuizRepository(db *DB) *PostgresQuizRepository {
 // CreateQuiz creates a new quiz
 func (r *PostgresQuizRepository) CreateQuiz(ctx context.Context, quiz *model.Quiz) error {
 	query := `
-		INSERT INTO quizzes (id, title, creator_id, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO quizzes (id, title, creator_id, status, code, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 	_, err := r.db.ExecContext(
 		ctx,
@@ -33,6 +33,7 @@ func (r *PostgresQuizRepository) CreateQuiz(ctx context.Context, quiz *model.Qui
 		quiz.Title,
 		quiz.CreatorID,
 		quiz.Status,
+		quiz.Code,
 		quiz.CreatedAt,
 		quiz.UpdatedAt,
 	)
@@ -42,7 +43,7 @@ func (r *PostgresQuizRepository) CreateQuiz(ctx context.Context, quiz *model.Qui
 // GetQuizByID retrieves a quiz by its ID
 func (r *PostgresQuizRepository) GetQuizByID(ctx context.Context, id uuid.UUID) (*model.Quiz, error) {
 	query := `
-		SELECT id, title, creator_id, status, created_at, updated_at
+		SELECT id, title, creator_id, status, code, created_at, updated_at
 		FROM quizzes
 		WHERE id = $1
 	`
@@ -53,6 +54,36 @@ func (r *PostgresQuizRepository) GetQuizByID(ctx context.Context, id uuid.UUID) 
 		&quiz.Title,
 		&quiz.CreatorID,
 		&quiz.Status,
+		&quiz.Code,
+		&quiz.CreatedAt,
+		&quiz.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("quiz not found")
+		}
+		return nil, err
+	}
+
+	return &quiz, nil
+}
+
+// GetQuizByCode retrieves a quiz by its code
+func (r *PostgresQuizRepository) GetQuizByCode(ctx context.Context, code string) (*model.Quiz, error) {
+	query := `
+		SELECT id, title, creator_id, status, code, created_at, updated_at
+		FROM quizzes
+		WHERE code = $1
+	`
+
+	var quiz model.Quiz
+	err := r.db.QueryRowContext(ctx, query, code).Scan(
+		&quiz.ID,
+		&quiz.Title,
+		&quiz.CreatorID,
+		&quiz.Status,
+		&quiz.Code,
 		&quiz.CreatedAt,
 		&quiz.UpdatedAt,
 	)
@@ -70,7 +101,7 @@ func (r *PostgresQuizRepository) GetQuizByID(ctx context.Context, id uuid.UUID) 
 // GetQuizzesByCreatorID retrieves all quizzes created by a user
 func (r *PostgresQuizRepository) GetQuizzesByCreatorID(ctx context.Context, creatorID uuid.UUID) ([]*model.Quiz, error) {
 	query := `
-		SELECT id, title, creator_id, status, created_at, updated_at
+		SELECT id, title, creator_id, status, code, created_at, updated_at
 		FROM quizzes
 		WHERE creator_id = $1
 		ORDER BY created_at DESC
@@ -90,6 +121,7 @@ func (r *PostgresQuizRepository) GetQuizzesByCreatorID(ctx context.Context, crea
 			&quiz.Title,
 			&quiz.CreatorID,
 			&quiz.Status,
+			&quiz.Code,
 			&quiz.CreatedAt,
 			&quiz.UpdatedAt,
 		); err != nil {

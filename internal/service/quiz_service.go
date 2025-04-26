@@ -79,6 +79,15 @@ func (s *quizServiceImpl) GetQuiz(ctx context.Context, id uuid.UUID) (*model.Qui
 	return quiz, nil
 }
 
+// GetQuizByCode retrieves a quiz by its code
+func (s *quizServiceImpl) GetQuizByCode(ctx context.Context, code string) (*model.Quiz, error) {
+	quiz, err := s.quizRepo.GetQuizByCode(ctx, code)
+	if err != nil {
+		return nil, ErrQuizNotFound
+	}
+	return quiz, nil
+}
+
 // StartQuiz starts a quiz session
 func (s *quizServiceImpl) StartQuiz(ctx context.Context, quizID uuid.UUID) error {
 	// Get the quiz and session

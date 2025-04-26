@@ -137,6 +137,7 @@ func main() {
 		{
 			quizRoutes.GET("/:id", quizHandler.GetQuiz)
 			quizRoutes.POST("/:id/join", quizHandler.JoinQuiz)
+			quizRoutes.POST("/join", quizHandler.JoinQuizByCode) // Add new route to join by code
 		}
 
 		// Public question routes - viewing questions is public

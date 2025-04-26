@@ -16,6 +16,9 @@ type QuizService interface {
 	// GetQuiz retrieves a quiz by ID
 	GetQuiz(ctx context.Context, id uuid.UUID) (*model.Quiz, error)
 
+	// GetQuizByCode retrieves a quiz by its code
+	GetQuizByCode(ctx context.Context, code string) (*model.Quiz, error)
+
 	// StartQuiz starts a quiz session
 	StartQuiz(ctx context.Context, quizID uuid.UUID) error
 
@@ -87,6 +90,9 @@ type UserService interface {
 type ParticipantService interface {
 	// JoinQuiz allows a user to join a quiz as a participant
 	JoinQuiz(ctx context.Context, quizID uuid.UUID, name string) (*model.Participant, error)
+
+	// JoinQuizByCode allows a user to join a quiz using its code
+	JoinQuizByCode(ctx context.Context, code string, name string) (*model.Participant, error)
 
 	// GetParticipantByID retrieves a participant by ID
 	GetParticipantByID(ctx context.Context, id uuid.UUID) (*model.Participant, error)

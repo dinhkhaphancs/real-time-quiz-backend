@@ -251,3 +251,27 @@ func (h *QuizHandler) JoinQuiz(c *gin.Context) {
 		"participant": participantResponse,
 	})
 }
+
+// JoinQuizByCode allows a user to join a quiz using a code
+func (h *QuizHandler) JoinQuizByCode(c *gin.Context) {
+	var request struct {
+		Code string `json:"code" binding:"required"`
+		Name string `json:"name" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())
+		return
+	}
+
+	participant, err := h.participantService.JoinQuizByCode(c, request.Code, request.Name)
+	if err != nil {
+		response.WithError(c, http.StatusBadRequest, "Failed to join quiz", err.Error())
+		return
+	}
+
+	participantResponse := dto.ParticipantResponseFromModel(participant)
+	response.WithSuccess(c, http.StatusOK, "Successfully joined quiz", map[string]interface{}{
+		"participant": participantResponse,
+	})
+}

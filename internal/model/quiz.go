@@ -24,6 +24,7 @@ type Quiz struct {
 	Title     string     `json:"title" db:"title"`
 	CreatorID uuid.UUID  `json:"creatorId" db:"creator_id"`
 	Status    QuizStatus `json:"status" db:"status"`
+	Code      string     `json:"code" db:"code"`
 	CreatedAt time.Time  `json:"createdAt" db:"created_at"`
 	UpdatedAt time.Time  `json:"updatedAt" db:"updated_at"`
 }
@@ -45,9 +46,23 @@ func NewQuiz(title string, creatorID uuid.UUID) *Quiz {
 		Title:     title,
 		CreatorID: creatorID,
 		Status:    QuizStatusWaiting,
+		Code:      generateQuizCode(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
+}
+
+// generateQuizCode generates a random alphanumeric code for a quiz
+func generateQuizCode() string {
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Removed similar looking chars
+	const codeLength = 6
+
+	result := make([]byte, codeLength)
+	for i := range result {
+		u := uuid.New()
+		result[i] = charset[int(u[i%16])%len(charset)]
+	}
+	return string(result)
 }
 
 // NewQuizSession creates a new quiz session for the given quiz ID

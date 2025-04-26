@@ -111,6 +111,7 @@ erDiagram
         string title
         uuid creator_id FK
         enum status
+        string code UNIQUE
         timestamp created_at
         timestamp updated_at
     }
@@ -286,6 +287,70 @@ The application now implements JWT (JSON Web Token) authentication to secure pro
 
 The JWT implementation improves security by eliminating the need to pass user IDs in request bodies, preventing impersonation attacks. It also enables stateless authentication that scales well in distributed environments.
 
+## Quiz Code Feature
+
+The application now allows participants to join quizzes using a 6-character alphanumeric code instead of a UUID. This provides a more user-friendly experience for quiz participants.
+
+### How It Works
+
+1. **Code Generation**:
+   - When a quiz is created, a unique 6-character alphanumeric code is automatically generated
+   - The code uses a carefully selected character set (ABCDEFGHJKLMNPQRSTUVWXYZ23456789) that avoids similar-looking characters
+
+2. **Joining Process**:
+   - Participants can join using the new endpoint: `POST /api/v1/quizzes/join`
+   - The request body requires only the quiz code and participant name:
+     ```json
+     {
+       "code": "ABC123",
+       "name": "Participant Name"
+     }
+     ```
+   - The existing UUID-based joining endpoint remains functional for backward compatibility
+
+3. **Benefits**:
+   - Easier to share verbally or write down (e.g., on a whiteboard)
+   - More user-friendly than UUIDs for classroom/event settings
+   - Improved security by not exposing database IDs directly
+
+4. **Implementation Details**:
+   - Added a `code` column to the `quizzes` table with a UNIQUE constraint
+   - Enhanced repository layer with methods to find quizzes by code
+   - Added new service methods and API endpoints to support code-based joining
+   - The Postman collection has been updated with examples of the new endpoint
+
+### API Usage Example
+
+```http
+POST /api/v1/quizzes/join
+Content-Type: application/json
+
+{
+  "code": "ABC123", 
+  "name": "John Doe"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Successfully joined quiz",
+  "data": {
+    "participant": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "John Doe",
+      "quizId": "550e8400-e29b-41d4-a716-446655440001",
+      "score": 0,
+      "joinedAt": "2025-04-27T09:15:23Z"
+    }
+  },
+  "timestamp": "2025-04-27T09:15:23Z"
+}
+```
+
+The existing participant API endpoints (`/api/v1/participants/*`) remain unchanged as they operate using UUIDs for internal consistency.
+
 ## Recent Changes and Current Implementation Status
 
 - ✅ Refactored the user model to separate Users (creators) and Participants
@@ -299,6 +364,7 @@ The JWT implementation improves security by eliminating the need to pass user ID
 - ✅ Added JWT authentication with token-based authorization
 - ✅ Implemented protected routes for quiz and question management
 - ✅ Added ownership verification for quiz operations
+- ✅ Added quiz joining by code feature (participants can now join using a 6-character code instead of UUID)
 
 ### Current Implementation Status
 
@@ -309,6 +375,7 @@ The JWT implementation improves security by eliminating the need to pass user ID
 - ✅ Quiz creation and management
 - ✅ Question management
 - ✅ Participant joining
+- ✅ Quiz joining by code for improved usability
 - ✅ Dedicated participant management API endpoints
 - ✅ Real-time leaderboard updates
 - ✅ Basic quiz flow (waiting, active, completed states)
