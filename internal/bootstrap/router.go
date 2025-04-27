@@ -57,7 +57,6 @@ func setupRoutes(router *gin.Engine, handlers *Handlers, jwtManager *auth.JWTMan
 	quizRoutes := apiV1.Group("/quizzes")
 	{
 		// Public quiz routes
-		quizRoutes.GET("/:id", handlers.QuizHandler.GetQuiz)
 		quizRoutes.POST("/:id/join", handlers.QuizHandler.JoinQuiz)
 		quizRoutes.POST("/join", handlers.QuizHandler.JoinQuizByCode)
 
@@ -65,8 +64,9 @@ func setupRoutes(router *gin.Engine, handlers *Handlers, jwtManager *auth.JWTMan
 		quizPrivate := quizRoutes.Group("")
 		quizPrivate.Use(authMiddleware)
 		{
-			quizPrivate.POST("", handlers.QuizHandler.CreateQuiz)
 			quizPrivate.GET("/my", handlers.QuizHandler.GetCurrentUserQuizzes)
+			quizPrivate.GET("/:id", handlers.QuizHandler.GetQuiz)
+			quizPrivate.POST("", handlers.QuizHandler.CreateQuiz)
 			quizPrivate.POST("/:id/start", handlers.QuizHandler.StartQuiz)
 			quizPrivate.POST("/:id/end", handlers.QuizHandler.EndQuiz)
 		}

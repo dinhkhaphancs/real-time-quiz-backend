@@ -88,6 +88,9 @@ func (h *QuizHandler) CreateQuiz(c *gin.Context) {
 
 // GetQuiz retrieves quiz details
 func (h *QuizHandler) GetQuiz(c *gin.Context) {
+	// Get auth user ID from JWT context
+	authUserId := middleware.GetAuthUserID(c)
+
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -122,8 +125,11 @@ func (h *QuizHandler) GetQuiz(c *gin.Context) {
 
 	var questionResponses []dto.QuestionResponse
 	for _, q := range questions {
-		// Don't include correct answer in the response unless quiz is finished
-		includeAnswer := session != nil && session.EndedAt != nil
+		// Include correct answers for authenticated users, or for non-authenticated users only if the quiz has ended
+		includeAnswer := true
+		if authUserId == uuid.Nil {
+			includeAnswer = session != nil && session.EndedAt != nil
+		}
 		questionResponses = append(questionResponses, dto.QuestionResponseFromModel(q, includeAnswer))
 	}
 
