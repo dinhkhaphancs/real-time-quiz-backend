@@ -47,10 +47,6 @@ func NewQuizService(
 
 // CreateQuiz creates a new quiz with the specified creator
 func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, description string, creatorID uuid.UUID) (*model.Quiz, error) {
-	if title == "" {
-		return nil, errors.New("title is required")
-	}
-
 	// Verify user exists
 	creator, err := s.userRepo.GetUserByID(ctx, creatorID)
 	if err != nil {
@@ -76,10 +72,6 @@ func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, descript
 
 // CreateQuizWithQuestions creates a new quiz with questions
 func (s *quizServiceImpl) CreateQuizWithQuestions(ctx context.Context, title string, description string, creatorID uuid.UUID, questions []dto.QuestionCreateData) (*model.Quiz, error) {
-	if title == "" {
-		return nil, errors.New("title is required")
-	}
-
 	if len(questions) == 0 {
 		return nil, errors.New("at least one question is required")
 	}
@@ -108,15 +100,6 @@ func (s *quizServiceImpl) CreateQuizWithQuestions(ctx context.Context, title str
 
 	// Create questions
 	for i, q := range questions {
-		// Validate question data
-		if q.Text == "" {
-			return nil, errors.New("question text is required")
-		}
-
-		if len(q.Options) < 2 {
-			return nil, errors.New("question must have at least 2 options")
-		}
-
 		// Validate at least one option is marked as correct
 		hasCorrectOption := false
 		for _, opt := range q.Options {
@@ -134,10 +117,6 @@ func (s *quizServiceImpl) CreateQuizWithQuestions(ctx context.Context, title str
 		questionType := model.QuestionTypeSingleChoice
 		if q.QuestionType == string(model.QuestionTypeMultipleChoice) {
 			questionType = model.QuestionTypeMultipleChoice
-		}
-
-		if q.TimeLimit <= 0 {
-			return nil, errors.New("time limit must be positive")
 		}
 
 		// Create question with order based on array position
@@ -284,11 +263,6 @@ func (s *quizServiceImpl) GetQuizzesByCreatorID(ctx context.Context, creatorID u
 
 // UpdateQuiz updates an existing quiz
 func (s *quizServiceImpl) UpdateQuiz(ctx context.Context, quizID uuid.UUID, title string, description string) (*model.Quiz, error) {
-	// Validate inputs
-	if title == "" {
-		return nil, errors.New("title is required")
-	}
-
 	// Check if quiz exists and get the current data
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -308,13 +282,8 @@ func (s *quizServiceImpl) UpdateQuiz(ctx context.Context, quizID uuid.UUID, titl
 	return quiz, nil
 }
 
-// UpdateQuizWithQuestions updates an existing quiz with its questions
-func (s *quizServiceImpl) UpdateQuizWithQuestions(ctx context.Context, quizID uuid.UUID, title string, description string, questions []dto.QuestionUpdateData) (*model.Quiz, error) {
-	// Validate inputs
-	if title == "" {
-		return nil, errors.New("title is required")
-	}
-
+// validateQuizForUpdate validates a quiz can be updated
+func (s *quizServiceImpl) validateQuizForUpdate(ctx context.Context, quizID uuid.UUID, title string) (*model.Quiz, error) {
 	// Check if quiz exists and get the current data
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -324,6 +293,232 @@ func (s *quizServiceImpl) UpdateQuizWithQuestions(ctx context.Context, quizID uu
 	// Only allow updating quizzes in WAITING state
 	if quiz.Status != model.QuizStatusWaiting {
 		return nil, errors.New("cannot update a quiz that has already started or completed")
+	}
+
+	return quiz, nil
+}
+
+// validateQuestionOptions validates if a question has valid options
+func (s *quizServiceImpl) validateQuestionOptions(options []dto.OptionData) error {
+	if len(options) < 2 {
+		return errors.New("question must have at least 2 options")
+	}
+
+	// Validate at least one option is marked as correct
+	hasCorrectOption := false
+	for _, opt := range options {
+		if opt.IsCorrect {
+			hasCorrectOption = true
+			break
+		}
+	}
+
+	if !hasCorrectOption {
+		return errors.New("question must have at least one correct option")
+	}
+
+	return nil
+}
+
+// updateExistingQuestion updates an existing question and its options
+func (s *quizServiceImpl) updateExistingQuestion(
+	ctx context.Context,
+	questionID uuid.UUID,
+	quizID uuid.UUID,
+	questionData dto.QuestionUpdateData,
+	questionOrder int,
+	existingQuestionMap map[string]*model.Question,
+) error {
+	// Check if this question belongs to the quiz
+	existingQuestion, exists := existingQuestionMap[questionID.String()]
+	if !exists || existingQuestion.QuizID != quizID {
+		return errors.New("question does not belong to this quiz")
+	}
+
+	// Validate options
+	if err := s.validateQuestionOptions(questionData.Options); err != nil {
+		return err
+	}
+
+	// Parse question type
+	questionType := model.QuestionTypeSingleChoice
+	if questionData.QuestionType == string(model.QuestionTypeMultipleChoice) {
+		questionType = model.QuestionTypeMultipleChoice
+	}
+
+	// Update the question
+	existingQuestion.Text = questionData.Text
+	existingQuestion.TimeLimit = questionData.TimeLimit
+	existingQuestion.QuestionType = questionType
+	existingQuestion.Order = questionOrder
+	existingQuestion.UpdatedAt = time.Now()
+
+	// Save the question updates
+	if err := s.questionRepo.UpdateQuestion(ctx, existingQuestion); err != nil {
+		return err
+	}
+
+	// Update options for this question
+	if err := s.updateQuestionOptions(ctx, questionID, questionData.Options); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// updateQuestionOptions updates options for a question
+func (s *quizServiceImpl) updateQuestionOptions(
+	ctx context.Context,
+	questionID uuid.UUID,
+	optionsData []dto.OptionData,
+) error {
+	// Get existing options for this question
+	existingOptions, err := s.questionOptionRepo.GetQuestionOptionsByQuestionID(ctx, questionID)
+	if err != nil {
+		return err
+	}
+
+	// Create a map of existing option IDs for easy lookup
+	existingOptionMap := make(map[string]*model.QuestionOption)
+	for _, opt := range existingOptions {
+		existingOptionMap[opt.ID.String()] = opt
+	}
+
+	// Track options that are kept in the update
+	updatedOptionIDs := make(map[string]struct{})
+
+	// Process each option in the question update
+	for j, optData := range optionsData {
+		if optData.ID != nil && *optData.ID != "" {
+			// This is an existing option to update
+			if err := s.updateExistingOption(ctx, optData, j+1, questionID, existingOptionMap, updatedOptionIDs); err != nil {
+				return err
+			}
+		} else {
+			// This is a new option to create
+			if err := s.createNewOption(ctx, optData, j+1, questionID); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Delete options that were not included in the update
+	for _, existingOption := range existingOptions {
+		if _, exists := updatedOptionIDs[existingOption.ID.String()]; !exists {
+			// Option was not in the update, delete it
+			if err := s.questionOptionRepo.DeleteQuestionOption(ctx, existingOption.ID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// updateExistingOption updates an existing option
+func (s *quizServiceImpl) updateExistingOption(
+	ctx context.Context,
+	optData dto.OptionData,
+	defaultOrder int,
+	questionID uuid.UUID,
+	existingOptionMap map[string]*model.QuestionOption,
+	updatedOptionIDs map[string]struct{},
+) error {
+	optionID, err := uuid.Parse(*optData.ID)
+	if err != nil {
+		return errors.New("invalid option ID format")
+	}
+
+	// Check if this option exists and belongs to the question
+	existingOption, exists := existingOptionMap[optionID.String()]
+	if !exists || existingOption.QuestionID != questionID {
+		return errors.New("option does not belong to this question")
+	}
+
+	// Mark this option as updated
+	updatedOptionIDs[optionID.String()] = struct{}{}
+
+	// Update the option
+	existingOption.Text = optData.Text
+	existingOption.IsCorrect = optData.IsCorrect
+	existingOption.DisplayOrder = defaultOrder // Use array index + 1 if display order not provided
+	if optData.DisplayOrder > 0 {
+		existingOption.DisplayOrder = optData.DisplayOrder
+	}
+	existingOption.UpdatedAt = time.Now()
+
+	// Save the option updates
+	return s.questionOptionRepo.UpdateQuestionOption(ctx, existingOption)
+}
+
+// createNewOption creates a new option for a question
+func (s *quizServiceImpl) createNewOption(
+	ctx context.Context,
+	optData dto.OptionData,
+	defaultOrder int,
+	questionID uuid.UUID,
+) error {
+	displayOrder := defaultOrder
+	if optData.DisplayOrder > 0 {
+		displayOrder = optData.DisplayOrder
+	}
+
+	option := model.NewQuestionOption(questionID, optData.Text, optData.IsCorrect, displayOrder)
+
+	// Save option to database
+	return s.questionOptionRepo.CreateQuestionOption(ctx, option)
+}
+
+// createNewQuestion creates a new question with its options
+func (s *quizServiceImpl) createNewQuestion(
+	ctx context.Context,
+	quizID uuid.UUID,
+	questionData dto.QuestionUpdateData,
+	questionOrder int,
+) error {
+	// Validate options
+	if err := s.validateQuestionOptions(questionData.Options); err != nil {
+		return err
+	}
+
+	// Parse question type
+	questionType := model.QuestionTypeSingleChoice
+	if questionData.QuestionType == string(model.QuestionTypeMultipleChoice) {
+		questionType = model.QuestionTypeMultipleChoice
+	}
+
+	// Create question with order based on array position
+	question := model.NewQuestion(quizID, questionData.Text, questionType, questionData.TimeLimit, questionOrder)
+
+	// Save the question first to ensure it has an ID
+	if err := s.questionRepo.CreateQuestion(ctx, question); err != nil {
+		return err
+	}
+
+	// Create options for the question
+	for j, optData := range questionData.Options {
+		displayOrder := j + 1 // Use array index + 1 if display order not provided
+		if optData.DisplayOrder > 0 {
+			displayOrder = optData.DisplayOrder
+		}
+
+		option := model.NewQuestionOption(question.ID, optData.Text, optData.IsCorrect, displayOrder)
+
+		// Save option to database
+		if err := s.questionOptionRepo.CreateQuestionOption(ctx, option); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UpdateQuizWithQuestions updates an existing quiz with its questions
+func (s *quizServiceImpl) UpdateQuizWithQuestions(ctx context.Context, quizID uuid.UUID, title string, description string, questions []dto.QuestionUpdateData) (*model.Quiz, error) {
+	// Validate and get quiz
+	quiz, err := s.validateQuizForUpdate(ctx, quizID, title)
+	if err != nil {
+		return nil, err
 	}
 
 	// Update quiz basic fields
@@ -360,106 +555,17 @@ func (s *quizServiceImpl) UpdateQuizWithQuestions(ctx context.Context, quizID uu
 				return nil, errors.New("invalid question ID format")
 			}
 
-			// Check if this question belongs to the quiz
-			existingQuestion, exists := existingQuestionMap[questionID.String()]
-			if !exists || existingQuestion.QuizID != quizID {
-				return nil, errors.New("question does not belong to this quiz")
-			}
-
 			// Mark this question as updated
 			updatedQuestionIDs[questionID.String()] = struct{}{}
 
-			// Validate options
-			if len(questionData.Options) < 2 {
-				return nil, errors.New("question must have at least 2 options")
-			}
-
-			// Validate at least one option is marked as correct
-			hasCorrectOption := false
-			for _, opt := range questionData.Options {
-				if opt.IsCorrect {
-					hasCorrectOption = true
-					break
-				}
-			}
-
-			if !hasCorrectOption {
-				return nil, errors.New("question must have at least one correct option")
-			}
-
-			// Parse question type
-			questionType := model.QuestionTypeSingleChoice
-			if questionData.QuestionType == string(model.QuestionTypeMultipleChoice) {
-				questionType = model.QuestionTypeMultipleChoice
-			}
-
-			// Update the question
-			existingQuestion.Text = questionData.Text
-			existingQuestion.TimeLimit = questionData.TimeLimit
-			existingQuestion.QuestionType = questionType
-			existingQuestion.Order = i + 1 // Update order based on position in array
-			existingQuestion.UpdatedAt = time.Now()
-
-			// Save the question first to ensure it exists
-			if err := s.questionRepo.UpdateQuestion(ctx, existingQuestion); err != nil {
+			// Update the existing question and its options
+			if err := s.updateExistingQuestion(ctx, questionID, quizID, questionData, i+1, existingQuestionMap); err != nil {
 				return nil, err
-			}
-
-			// Handle options - first delete all existing options
-			if err := s.questionRepo.DeleteQuestion(ctx, questionID); err != nil {
-				return nil, err
-			}
-
-			// Create new options
-			for _, optData := range questionData.Options {
-				option := model.NewQuestionOption(questionID, optData.Text, optData.IsCorrect, optData.DisplayOrder)
-
-				// Save option to database
-				if err := s.questionOptionRepo.CreateQuestionOption(ctx, option); err != nil {
-					return nil, err
-				}
 			}
 		} else {
 			// This is a new question, add it
-			if len(questionData.Options) < 2 {
-				return nil, errors.New("question must have at least 2 options")
-			}
-
-			// Validate at least one option is marked as correct
-			hasCorrectOption := false
-			for _, opt := range questionData.Options {
-				if opt.IsCorrect {
-					hasCorrectOption = true
-					break
-				}
-			}
-
-			if !hasCorrectOption {
-				return nil, errors.New("question must have at least one correct option")
-			}
-
-			// Parse question type
-			questionType := model.QuestionTypeSingleChoice
-			if questionData.QuestionType == string(model.QuestionTypeMultipleChoice) {
-				questionType = model.QuestionTypeMultipleChoice
-			}
-
-			// Create question with order based on array position
-			question := model.NewQuestion(quizID, questionData.Text, questionType, questionData.TimeLimit, i+1)
-
-			// Save the question first to ensure it has an ID
-			if err := s.questionRepo.CreateQuestion(ctx, question); err != nil {
+			if err := s.createNewQuestion(ctx, quizID, questionData, i+1); err != nil {
 				return nil, err
-			}
-
-			// Create options for the question
-			for _, optData := range questionData.Options {
-				option := model.NewQuestionOption(question.ID, optData.Text, optData.IsCorrect, optData.DisplayOrder)
-
-				// Save option to database
-				if err := s.questionOptionRepo.CreateQuestionOption(ctx, option); err != nil {
-					return nil, err
-				}
 			}
 		}
 	}
