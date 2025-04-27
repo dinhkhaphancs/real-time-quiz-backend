@@ -30,10 +30,10 @@ type UserResponse struct {
 // UserLoginResponse represents the response for user login with token
 type UserLoginResponse struct {
 	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
-	TokenType    string       `json:"token_type"`
-	ExpiresIn    int64        `json:"expires_in"` // Expiration time in seconds
+	AccessToken  string       `json:"accessToken"`
+	RefreshToken string       `json:"refreshToken"`
+	TokenType    string       `json:"tokenType"`
+	ExpiresIn    int64        `json:"expiresIn"` // Expiration time in seconds
 }
 
 // UserResponseFromModel converts a User model to a UserResponse

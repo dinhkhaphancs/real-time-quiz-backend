@@ -123,6 +123,7 @@ func main() {
 		{
 			// Quiz routes - creating/managing quizzes requires authentication
 			authorized.POST("/quizzes", quizHandler.CreateQuiz)
+			authorized.GET("/quizzes/my", quizHandler.GetCurrentUserQuizzes) // New endpoint to get current user's quizzes
 			authorized.POST("/quizzes/:id/start", quizHandler.StartQuiz)
 			authorized.POST("/quizzes/:id/end", quizHandler.EndQuiz)
 

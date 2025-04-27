@@ -19,6 +19,9 @@ type QuizService interface {
 	// GetQuizByCode retrieves a quiz by its code
 	GetQuizByCode(ctx context.Context, code string) (*model.Quiz, error)
 
+	// GetQuizzesByCreatorID retrieves all quizzes created by a user
+	GetQuizzesByCreatorID(ctx context.Context, creatorID uuid.UUID) ([]*model.Quiz, error)
+
 	// StartQuiz starts a quiz session
 	StartQuiz(ctx context.Context, quizID uuid.UUID) error
 

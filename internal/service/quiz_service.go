@@ -181,3 +181,12 @@ func (s *quizServiceImpl) GetQuizSession(ctx context.Context, quizID uuid.UUID) 
 	}
 	return session, nil
 }
+
+// GetQuizzesByCreatorID retrieves all quizzes created by a user
+func (s *quizServiceImpl) GetQuizzesByCreatorID(ctx context.Context, creatorID uuid.UUID) ([]*model.Quiz, error) {
+	quizzes, err := s.quizRepo.GetQuizzesByCreatorID(ctx, creatorID)
+	if err != nil {
+		return nil, err
+	}
+	return quizzes, nil
+}

@@ -275,3 +275,28 @@ func (h *QuizHandler) JoinQuizByCode(c *gin.Context) {
 		"participant": participantResponse,
 	})
 }
+
+// GetCurrentUserQuizzes retrieves all quizzes created by the authenticated user
+func (h *QuizHandler) GetCurrentUserQuizzes(c *gin.Context) {
+	// Get authenticated user ID from JWT context
+	userID := middleware.GetAuthUserID(c)
+	if userID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
+		return
+	}
+
+	// Get quizzes created by the user
+	quizzes, err := h.quizService.GetQuizzesByCreatorID(c, userID)
+	if err != nil {
+		response.WithError(c, http.StatusInternalServerError, "Failed to get quizzes", err.Error())
+		return
+	}
+
+	// Convert to DTOs
+	var quizResponses []dto.QuizResponse
+	for _, quiz := range quizzes {
+		quizResponses = append(quizResponses, dto.QuizResponseFromModel(quiz))
+	}
+
+	response.WithSuccess(c, http.StatusOK, "Quizzes retrieved successfully", quizResponses)
+}
