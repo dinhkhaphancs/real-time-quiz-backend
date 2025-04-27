@@ -6,7 +6,7 @@ build:
 
 # Run the application
 run:
-	export APP_CONFIG_FILE=/Users/calvin/Documents/working/me/interview/btaskee/home_assignment/real-time-quiz/real-time-quiz-backend/config.yaml && go run cmd/main.go
+	APP_CONFIG_FILE=./config.yaml go run cmd/main.go
 
 # Run tests
 test:

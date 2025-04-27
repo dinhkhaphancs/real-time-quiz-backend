@@ -472,6 +472,8 @@ command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" 
 - ✅ Basic quiz flow (waiting, active, completed states)
 - ✅ Role-based WebSocket communication (different events for creators vs participants)
 - ✅ Real-time notifications when participants join or leave
+- ✅ Bootstrap pattern implementation for improved code organization
+- ✅ Modular API structure organized by domain with clear public/private route separation
 
 ### Standardized Response Pattern
 
@@ -524,36 +526,71 @@ The response pattern offers:
 
 The project follows a clean architecture with clear separation of concerns:
 
-1. **DTO Layer** (`/internal/dto/`):
+1. **Bootstrap Layer** (`/internal/bootstrap/`):
+   - Application initialization and dependency management
+   - Component wiring with clear flow from repositories → services → handlers
+   - Modular application startup with separate concerns:
+     - `app.go`: The central application coordinator
+     - `repositories.go`: Repository instances creation
+     - `services.go`: Service layer initialization
+     - `handlers.go`: API handlers construction
+     - `router.go`: Route configuration with domain-based organization
+     - `server.go`: HTTP server setup and lifecycle management
+
+2. **DTO Layer** (`/internal/dto/`):
    - Data Transfer Objects for API request/response
    - Simplified naming convention (removed redundant "Dto" suffix)
    - Conversion functions from domain models to DTOs
 
-2. **Handler Layer** (`/internal/handler/`):
+3. **Handler Layer** (`/internal/handler/`):
    - API endpoints using Gin framework
    - Standardized response handling
    - Request validation
    - WebSocket connection management
+   - Business logic delegation to service layer
 
-3. **Service Layer** (`/internal/service/`):
+4. **Service Layer** (`/internal/service/`):
    - Business logic implementation
    - Transaction management
    - Domain validations
+   - Cross-cutting concerns coordination
 
-4. **Repository Layer** (`/internal/repository/`):
+5. **Repository Layer** (`/internal/repository/`):
    - Data access abstraction
    - Database interactions
    - Query construction
+   - Persistence operations
 
-5. **Model Layer** (`/internal/model/`):
+6. **Model Layer** (`/internal/model/`):
    - Domain models representing core business entities
    - Business rules and validations
+   - Application's central data structures
 
-6. **Utility Packages** (`/pkg/`):
+7. **Middleware Layer** (`/internal/middleware/`):
+   - Request pre-processing and post-processing
+   - Authentication and authorization
+   - Request logging and monitoring
+   - Cross-cutting concerns
+
+8. **Configuration Layer** (`/internal/config/`):
+   - Application configuration loading
+   - Environment-specific settings
+   - Secrets management
+
+9. **Utility Packages** (`/pkg/`):
+   - `auth`: Authentication utilities (JWT implementation)
    - `response`: Standardized API response handling
-   - `websocket`: WebSocket implementation
+   - `websocket`: WebSocket implementation for real-time communication
    - `logger`: Application logging
    - `validator`: Input validation utilities
+
+This layered architecture provides:
+- Clear separation of concerns
+- Improved maintainability through focused components
+- Better testability with well-defined boundaries
+- Consistent API design and response formatting
+- Simplified onboarding for new developers
+- Scalable code organization as the application grows
 
 ### TODO to Fulfill Requirements
 
