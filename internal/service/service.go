@@ -11,7 +11,10 @@ import (
 // QuizService defines operations for quiz business logic
 type QuizService interface {
 	// CreateQuiz creates a new quiz
-	CreateQuiz(ctx context.Context, title string, creatorID uuid.UUID) (*model.Quiz, error)
+	CreateQuiz(ctx context.Context, title string, description string, creatorID uuid.UUID) (*model.Quiz, error)
+
+	// CreateQuizWithQuestions creates a new quiz with questions
+	CreateQuizWithQuestions(ctx context.Context, title string, description string, creatorID uuid.UUID, questions []dto.QuestionCreateData) (*model.Quiz, error)
 
 	// GetQuiz retrieves a quiz by ID
 	GetQuiz(ctx context.Context, id uuid.UUID) (*model.Quiz, error)

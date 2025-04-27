@@ -23,14 +23,15 @@ func NewPostgresQuizRepository(db *DB) *PostgresQuizRepository {
 // CreateQuiz creates a new quiz
 func (r *PostgresQuizRepository) CreateQuiz(ctx context.Context, quiz *model.Quiz) error {
 	query := `
-		INSERT INTO quizzes (id, title, creator_id, status, code, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO quizzes (id, title, description, creator_id, status, code, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
 		quiz.ID,
 		quiz.Title,
+		quiz.Description,
 		quiz.CreatorID,
 		quiz.Status,
 		quiz.Code,
@@ -43,15 +44,17 @@ func (r *PostgresQuizRepository) CreateQuiz(ctx context.Context, quiz *model.Qui
 // GetQuizByID retrieves a quiz by its ID
 func (r *PostgresQuizRepository) GetQuizByID(ctx context.Context, id uuid.UUID) (*model.Quiz, error) {
 	query := `
-		SELECT id, title, creator_id, status, code, created_at, updated_at
+		SELECT id, title, description, creator_id, status, code, created_at, updated_at
 		FROM quizzes
 		WHERE id = $1
 	`
 
 	var quiz model.Quiz
+	var description sql.NullString // Use sql.NullString to handle NULL values
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&quiz.ID,
 		&quiz.Title,
+		&description,
 		&quiz.CreatorID,
 		&quiz.Status,
 		&quiz.Code,
@@ -64,6 +67,13 @@ func (r *PostgresQuizRepository) GetQuizByID(ctx context.Context, id uuid.UUID) 
 			return nil, errors.New("quiz not found")
 		}
 		return nil, err
+	}
+
+	// Convert NullString to string
+	if description.Valid {
+		quiz.Description = description.String
+	} else {
+		quiz.Description = ""
 	}
 
 	return &quiz, nil
@@ -72,15 +82,17 @@ func (r *PostgresQuizRepository) GetQuizByID(ctx context.Context, id uuid.UUID) 
 // GetQuizByCode retrieves a quiz by its code
 func (r *PostgresQuizRepository) GetQuizByCode(ctx context.Context, code string) (*model.Quiz, error) {
 	query := `
-		SELECT id, title, creator_id, status, code, created_at, updated_at
+		SELECT id, title, description, creator_id, status, code, created_at, updated_at
 		FROM quizzes
 		WHERE code = $1
 	`
 
 	var quiz model.Quiz
+	var description sql.NullString // Use sql.NullString to handle NULL values
 	err := r.db.QueryRowContext(ctx, query, code).Scan(
 		&quiz.ID,
 		&quiz.Title,
+		&description,
 		&quiz.CreatorID,
 		&quiz.Status,
 		&quiz.Code,
@@ -95,13 +107,20 @@ func (r *PostgresQuizRepository) GetQuizByCode(ctx context.Context, code string)
 		return nil, err
 	}
 
+	// Convert NullString to string
+	if description.Valid {
+		quiz.Description = description.String
+	} else {
+		quiz.Description = ""
+	}
+
 	return &quiz, nil
 }
 
 // GetQuizzesByCreatorID retrieves all quizzes created by a user
 func (r *PostgresQuizRepository) GetQuizzesByCreatorID(ctx context.Context, creatorID uuid.UUID) ([]*model.Quiz, error) {
 	query := `
-		SELECT id, title, creator_id, status, code, created_at, updated_at
+		SELECT id, title, description, creator_id, status, code, created_at, updated_at
 		FROM quizzes
 		WHERE creator_id = $1
 		ORDER BY created_at DESC
@@ -116,9 +135,11 @@ func (r *PostgresQuizRepository) GetQuizzesByCreatorID(ctx context.Context, crea
 	var quizzes []*model.Quiz
 	for rows.Next() {
 		var quiz model.Quiz
+		var description sql.NullString // Use sql.NullString to handle NULL values
 		if err := rows.Scan(
 			&quiz.ID,
 			&quiz.Title,
+			&description,
 			&quiz.CreatorID,
 			&quiz.Status,
 			&quiz.Code,
@@ -127,6 +148,14 @@ func (r *PostgresQuizRepository) GetQuizzesByCreatorID(ctx context.Context, crea
 		); err != nil {
 			return nil, err
 		}
+
+		// Convert NullString to string
+		if description.Valid {
+			quiz.Description = description.String
+		} else {
+			quiz.Description = ""
+		}
+
 		quizzes = append(quizzes, &quiz)
 	}
 

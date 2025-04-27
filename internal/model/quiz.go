@@ -20,13 +20,14 @@ const (
 
 // Quiz represents a quiz that can be joined by users
 type Quiz struct {
-	ID        uuid.UUID  `json:"id" db:"id"`
-	Title     string     `json:"title" db:"title"`
-	CreatorID uuid.UUID  `json:"creatorId" db:"creator_id"`
-	Status    QuizStatus `json:"status" db:"status"`
-	Code      string     `json:"code" db:"code"`
-	CreatedAt time.Time  `json:"createdAt" db:"created_at"`
-	UpdatedAt time.Time  `json:"updatedAt" db:"updated_at"`
+	ID          uuid.UUID  `json:"id" db:"id"`
+	Title       string     `json:"title" db:"title"`
+	Description string     `json:"description" db:"description"`
+	CreatorID   uuid.UUID  `json:"creatorId" db:"creator_id"`
+	Status      QuizStatus `json:"status" db:"status"`
+	Code        string     `json:"code" db:"code"`
+	CreatedAt   time.Time  `json:"createdAt" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updatedAt" db:"updated_at"`
 }
 
 // QuizSession represents the current state of an active quiz
@@ -39,16 +40,17 @@ type QuizSession struct {
 	CurrentQuestionStartedAt *time.Time `json:"currentQuestionStartedAt" db:"current_question_started_at"`
 }
 
-// NewQuiz creates a new quiz with the given title and creator ID
-func NewQuiz(title string, creatorID uuid.UUID) *Quiz {
+// NewQuiz creates a new quiz with the given title, description, and creator ID
+func NewQuiz(title string, description string, creatorID uuid.UUID) *Quiz {
 	return &Quiz{
-		ID:        uuid.New(),
-		Title:     title,
-		CreatorID: creatorID,
-		Status:    QuizStatusWaiting,
-		Code:      generateQuizCode(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ID:          uuid.New(),
+		Title:       title,
+		Description: description,
+		CreatorID:   creatorID,
+		Status:      QuizStatusWaiting,
+		Code:        generateQuizCode(),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 }
 

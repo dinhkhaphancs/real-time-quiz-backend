@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/repository"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/websocket"
@@ -42,7 +43,7 @@ func NewQuizService(
 }
 
 // CreateQuiz creates a new quiz with the specified creator
-func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, creatorID uuid.UUID) (*model.Quiz, error) {
+func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, description string, creatorID uuid.UUID) (*model.Quiz, error) {
 	if title == "" {
 		return nil, errors.New("title is required")
 	}
@@ -54,7 +55,7 @@ func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, creatorI
 	}
 
 	// Create the quiz
-	quiz := model.NewQuiz(title, creator.ID)
+	quiz := model.NewQuiz(title, description, creator.ID)
 
 	// Create quiz session
 	session := model.NewQuizSession(quiz.ID)
@@ -65,6 +66,66 @@ func (s *quizServiceImpl) CreateQuiz(ctx context.Context, title string, creatorI
 	}
 	if err := s.quizRepo.CreateQuizSession(ctx, session); err != nil {
 		return nil, err
+	}
+
+	return quiz, nil
+}
+
+// CreateQuizWithQuestions creates a new quiz with questions
+func (s *quizServiceImpl) CreateQuizWithQuestions(ctx context.Context, title string, description string, creatorID uuid.UUID, questions []dto.QuestionCreateData) (*model.Quiz, error) {
+	if title == "" {
+		return nil, errors.New("title is required")
+	}
+
+	if len(questions) == 0 {
+		return nil, errors.New("at least one question is required")
+	}
+
+	// Verify user exists
+	creator, err := s.userRepo.GetUserByID(ctx, creatorID)
+	if err != nil {
+		return nil, errors.New("creator not found")
+	}
+
+	// Create the quiz
+	quiz := model.NewQuiz(title, description, creator.ID)
+
+	// Create quiz session
+	session := model.NewQuizSession(quiz.ID)
+
+	// Save quiz to database
+	if err := s.quizRepo.CreateQuiz(ctx, quiz); err != nil {
+		return nil, err
+	}
+
+	// Save quiz session to database
+	if err := s.quizRepo.CreateQuizSession(ctx, session); err != nil {
+		return nil, err
+	}
+
+	// Create questions
+	for i, q := range questions {
+		// Validate question data
+		if q.Text == "" {
+			return nil, errors.New("question text is required")
+		}
+		if len(q.Options) != 4 {
+			return nil, errors.New("question must have exactly 4 options")
+		}
+		if q.CorrectAnswer == "" || (q.CorrectAnswer != "A" && q.CorrectAnswer != "B" && q.CorrectAnswer != "C" && q.CorrectAnswer != "D") {
+			return nil, errors.New("correct answer must be A, B, C, or D")
+		}
+		if q.TimeLimit <= 0 {
+			return nil, errors.New("time limit must be positive")
+		}
+
+		// Create question with order based on array position
+		question := model.NewQuestion(quiz.ID, q.Text, q.Options, q.CorrectAnswer, q.TimeLimit, i+1)
+
+		// Save question to database
+		if err := s.questionRepo.CreateQuestion(ctx, question); err != nil {
+			return nil, err
+		}
 	}
 
 	return quiz, nil

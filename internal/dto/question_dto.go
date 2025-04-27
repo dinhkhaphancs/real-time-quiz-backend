@@ -18,6 +18,14 @@ type QuestionCreateRequest struct {
 	TimeLimit     int            `json:"timeLimit" binding:"required,min=5,max=60"`
 }
 
+// QuestionCreateData represents a question to be created as part of a quiz
+type QuestionCreateData struct {
+	Text          string         `json:"text" binding:"required"`
+	Options       []model.Option `json:"options" binding:"required,len=4"`
+	CorrectAnswer string         `json:"correctAnswer" binding:"required"`
+	TimeLimit     int            `json:"timeLimit" binding:"required,min=5,max=60"`
+}
+
 // QuestionResponse represents a question in API responses
 type QuestionResponse struct {
 	ID            uuid.UUID      `json:"id"`

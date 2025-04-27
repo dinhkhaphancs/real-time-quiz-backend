@@ -57,19 +57,30 @@ func (h *QuizHandler) CreateQuiz(c *gin.Context) {
 		return
 	}
 
-	// Create the quiz
-	quiz, err := h.quizService.CreateQuiz(c, request.Title, creatorID)
+	// Create the quiz with questions
+	quiz, err := h.quizService.CreateQuizWithQuestions(c, request.Title, request.Description, creatorID, request.Questions)
 	if err != nil {
 		response.WithError(c, http.StatusInternalServerError, "Failed to create quiz", err.Error())
 		return
 	}
 
+	// Get the created questions for the response
+	questions, _ := h.questionService.GetQuestions(c, quiz.ID)
+
+	// Convert to DTOs
 	quizResponse := dto.QuizResponseFromModel(quiz)
 	creatorResponse := dto.CreatorResponseFromModel(creator)
 
+	var questionResponses []dto.QuestionResponse
+	for _, q := range questions {
+		questionResponses = append(questionResponses, dto.QuestionResponseFromModel(q, true))
+	}
+
+	// Create response data
 	data := map[string]interface{}{
-		"quiz":    quizResponse,
-		"creator": creatorResponse,
+		"quiz":      quizResponse,
+		"creator":   creatorResponse,
+		"questions": questionResponses,
 	}
 
 	response.WithSuccess(c, http.StatusCreated, response.MessageCreated, data)
@@ -107,7 +118,6 @@ func (h *QuizHandler) GetQuiz(c *gin.Context) {
 	participants, _ := h.participantService.GetParticipantsByQuizID(c, id)
 
 	// Convert to DTOs
-	quizResponse := dto.QuizResponseFromModel(quiz)
 	creatorResponse := dto.CreatorResponseFromModel(creator)
 
 	var questionResponses []dto.QuestionResponse
@@ -124,7 +134,7 @@ func (h *QuizHandler) GetQuiz(c *gin.Context) {
 
 	// Create quiz details response
 	quizDetails := dto.QuizDetails{
-		Quiz:         quizResponse,
+		Quiz:         *quiz,
 		Creator:      creatorResponse,
 		Questions:    questionResponses,
 		Participants: participantResponses,

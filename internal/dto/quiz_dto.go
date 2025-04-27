@@ -11,17 +11,21 @@ import (
 
 // QuizCreateRequest represents the request to create a new quiz
 type QuizCreateRequest struct {
-	Title string `json:"title" binding:"required"`
+	Title       string               `json:"title" binding:"required"`
+	Description string               `json:"description"`
+	Questions   []QuestionCreateData `json:"questions" binding:"required"`
 }
 
 // QuizResponse represents a quiz in API responses
 type QuizResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	CreatorID uuid.UUID `json:"creatorId"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID          uuid.UUID `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description,omitempty"`
+	CreatorID   uuid.UUID `json:"creatorId"`
+	Status      string    `json:"status"`
+	Code        string    `json:"code"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // CreatorResponse represents a quiz creator in API responses
@@ -42,7 +46,7 @@ type QuizSession struct {
 
 // QuizDetails represents complete quiz details including questions and participants
 type QuizDetails struct {
-	Quiz         QuizResponse          `json:"quiz"`
+	model.Quiz
 	Creator      CreatorResponse       `json:"creator,omitempty"`
 	Questions    []QuestionResponse    `json:"questions,omitempty"`
 	Session      *QuizSession          `json:"session,omitempty"`
@@ -62,12 +66,14 @@ type QuizJoinRequest struct {
 // QuizResponseFromModel converts a Quiz model to a QuizResponse
 func QuizResponseFromModel(model *model.Quiz) QuizResponse {
 	return QuizResponse{
-		ID:        model.ID,
-		Title:     model.Title,
-		CreatorID: model.CreatorID,
-		Status:    string(model.Status),
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:          model.ID,
+		Title:       model.Title,
+		Description: model.Description,
+		CreatorID:   model.CreatorID,
+		Status:      string(model.Status),
+		Code:        model.Code,
+		CreatedAt:   model.CreatedAt,
+		UpdatedAt:   model.UpdatedAt,
 	}
 }
 

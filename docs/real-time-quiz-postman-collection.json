@@ -97,14 +97,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"title\": \"General Knowledge Quiz\"\n}"
+              "raw": "{\n    \"title\": \"General Knowledge Quiz\",\n    \"description\": \"A quiz about various general knowledge topics\",\n    \"questions\": [\n        {\n            \"text\": \"What is the capital of France?\",\n            \"options\": [\n                {\"id\": \"A\", \"text\": \"London\"},\n                {\"id\": \"B\", \"text\": \"Berlin\"},\n                {\"id\": \"C\", \"text\": \"Paris\"},\n                {\"id\": \"D\", \"text\": \"Madrid\"}\n            ],\n            \"correctAnswer\": \"C\",\n            \"timeLimit\": 20\n        },\n        {\n            \"text\": \"Which planet is known as the Red Planet?\",\n            \"options\": [\n                {\"id\": \"A\", \"text\": \"Venus\"},\n                {\"id\": \"B\", \"text\": \"Mars\"},\n                {\"id\": \"C\", \"text\": \"Jupiter\"},\n                {\"id\": \"D\", \"text\": \"Saturn\"}\n            ],\n            \"correctAnswer\": \"B\",\n            \"timeLimit\": 15\n        }\n    ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/quizzes",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "quizzes"]
             },
-            "description": "Create a new quiz. Requires JWT authentication."
+            "description": "Create a new quiz with questions. Requires JWT authentication."
           },
           "response": []
         },

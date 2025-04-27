@@ -454,6 +454,8 @@ command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" 
 - ✅ Implemented protected routes for quiz and question management
 - ✅ Added ownership verification for quiz operations
 - ✅ Added quiz joining by code feature (participants can now join using a 6-character code instead of UUID)
+- ✅ Added quiz description support for more detailed quiz information
+- ✅ Enhanced quiz creation to support creating quizzes with questions in a single API call
 
 ### Current Implementation Status
 
