@@ -7,20 +7,22 @@ import (
 
 // Repositories holds all repository instances
 type Repositories struct {
-	QuizRepo        repository.QuizRepository
-	QuestionRepo    repository.QuestionRepository
-	UserRepo        repository.UserRepository
-	ParticipantRepo repository.ParticipantRepository
-	AnswerRepo      repository.AnswerRepository
+	QuizRepo           repository.QuizRepository
+	QuestionRepo       repository.QuestionRepository
+	QuestionOptionRepo repository.QuestionOptionRepository
+	UserRepo           repository.UserRepository
+	ParticipantRepo    repository.ParticipantRepository
+	AnswerRepo         repository.AnswerRepository
 }
 
 // NewRepositories initializes all repositories
 func NewRepositories(db *repository.DB) *Repositories {
 	return &Repositories{
-		QuizRepo:        repository.NewPostgresQuizRepository(db),
-		QuestionRepo:    repository.NewPostgresQuestionRepository(db),
-		UserRepo:        repository.NewPostgresUserRepository(db),
-		ParticipantRepo: repository.NewPostgresParticipantRepository(db),
-		AnswerRepo:      repository.NewPostgresAnswerRepository(db),
+		QuizRepo:           repository.NewPostgresQuizRepository(db),
+		QuestionRepo:       repository.NewPostgresQuestionRepository(db),
+		QuestionOptionRepo: repository.NewPostgresQuestionOptionRepository(db),
+		UserRepo:           repository.NewPostgresUserRepository(db),
+		ParticipantRepo:    repository.NewPostgresParticipantRepository(db),
+		AnswerRepo:         repository.NewPostgresAnswerRepository(db),
 	}
 }

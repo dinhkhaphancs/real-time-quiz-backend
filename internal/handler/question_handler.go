@@ -61,13 +61,13 @@ func (h *QuestionHandler) AddQuestion(c *gin.Context) {
 		return
 	}
 
-	// Create the question
+	// Create the question with the new interface that supports dynamic options and multiple choice
 	question, err := h.questionService.AddQuestion(
 		c,
 		quizID,
 		request.Text,
 		request.Options,
-		request.CorrectAnswer,
+		request.QuestionType,
 		request.TimeLimit,
 	)
 	if err != nil {

@@ -316,3 +316,105 @@ func (h *QuizHandler) GetCurrentUserQuizzes(c *gin.Context) {
 
 	response.WithSuccess(c, http.StatusOK, "Quizzes retrieved successfully", quizResponses)
 }
+
+// UpdateQuiz handles updating an existing quiz
+func (h *QuizHandler) UpdateQuiz(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
+		return
+	}
+
+	// Get authenticated user ID from JWT context
+	userID := middleware.GetAuthUserID(c)
+	if userID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
+		return
+	}
+
+	// Get the quiz to verify ownership
+	quiz, err := h.quizService.GetQuiz(c, id)
+	if err != nil {
+		response.WithError(c, http.StatusNotFound, "Quiz not found", err.Error())
+		return
+	}
+
+	// Check if the authenticated user is the quiz creator
+	if quiz.CreatorID != userID {
+		response.WithError(c, http.StatusForbidden, "Access denied", "Only the quiz creator can update this quiz")
+		return
+	}
+
+	// Parse request body
+	var request dto.QuizUpdateRequest
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())
+		return
+	}
+
+	// Update the quiz with questions
+	updatedQuiz, err := h.quizService.UpdateQuizWithQuestions(c, id, request.Title, request.Description, request.Questions)
+	if err != nil {
+		response.WithError(c, http.StatusBadRequest, "Failed to update quiz", err.Error())
+		return
+	}
+
+	// Get the updated questions for the response
+	questions, _ := h.questionService.GetQuestions(c, id)
+
+	// Convert to DTOs
+	quizResponse := dto.QuizResponseFromModel(updatedQuiz)
+
+	var questionResponses []dto.QuestionResponse
+	for _, q := range questions {
+		questionResponses = append(questionResponses, dto.QuestionResponseFromModel(q, true))
+	}
+
+	// Create response data
+	data := map[string]interface{}{
+		"quiz":      quizResponse,
+		"questions": questionResponses,
+	}
+
+	response.WithSuccess(c, http.StatusOK, "Quiz updated successfully", data)
+}
+
+// DeleteQuiz handles deleting a quiz
+func (h *QuizHandler) DeleteQuiz(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
+		return
+	}
+
+	// Get authenticated user ID from JWT context
+	userID := middleware.GetAuthUserID(c)
+	if userID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
+		return
+	}
+
+	// Get the quiz to verify ownership
+	quiz, err := h.quizService.GetQuiz(c, id)
+	if err != nil {
+		response.WithError(c, http.StatusNotFound, "Quiz not found", err.Error())
+		return
+	}
+
+	// Check if the authenticated user is the quiz creator
+	if quiz.CreatorID != userID {
+		response.WithError(c, http.StatusForbidden, "Access denied", "Only the quiz creator can delete this quiz")
+		return
+	}
+
+	// Delete the quiz
+	if err := h.quizService.DeleteQuiz(c, id); err != nil {
+		response.WithError(c, http.StatusBadRequest, "Failed to delete quiz", err.Error())
+		return
+	}
+
+	response.WithSuccess(c, http.StatusOK, "Quiz deleted successfully", nil)
+}

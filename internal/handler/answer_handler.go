@@ -31,13 +31,14 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 		return
 	}
 
-	// Parse UUIDs
+	// Parse participant ID from the request
 	participantID, err := uuid.Parse(request.ParticipantID)
 	if err != nil {
 		response.WithError(c, http.StatusBadRequest, "Invalid participant ID", "The provided participant ID is not valid")
 		return
 	}
 
+	// Parse question ID from the request
 	questionID, err := uuid.Parse(request.QuestionID)
 	if err != nil {
 		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
@@ -45,18 +46,17 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	}
 
 	// Submit the answer
-	answer, err := h.answerService.SubmitAnswer(c, participantID, questionID, request.SelectedOption)
+	answer, err := h.answerService.SubmitAnswer(c, participantID, questionID, request.SelectedOptions)
 	if err != nil {
 		response.WithError(c, http.StatusBadRequest, "Failed to submit answer", err.Error())
 		return
 	}
 
-	// Create a basic answer response that doesn't include sensitive fields
-	answerResponse := dto.AnswerBasicResponse{
-		ID:             answer.ID,
-		SelectedOption: answer.SelectedOption,
-		IsCorrect:      answer.IsCorrect,
-		Score:          answer.Score,
+	// Create a response using the updated DTO
+	answerResponse, err := dto.AnswerResponseFromModel(answer)
+	if err != nil {
+		response.WithError(c, http.StatusInternalServerError, "Failed to process answer data", err.Error())
+		return
 	}
 
 	response.WithSuccess(c, http.StatusCreated, "Answer submitted successfully", map[string]interface{}{
@@ -108,15 +108,10 @@ func (h *AnswerHandler) GetParticipantAnswer(c *gin.Context) {
 	}
 
 	// Convert to full answer response DTO
-	answerResponse := dto.AnswerResponse{
-		ID:             answer.ID,
-		ParticipantID:  answer.ParticipantID,
-		QuestionID:     answer.QuestionID,
-		SelectedOption: answer.SelectedOption,
-		IsCorrect:      answer.IsCorrect,
-		Score:          answer.Score,
-		AnsweredAt:     answer.AnsweredAt,
-		TimeTaken:      answer.TimeTaken,
+	answerResponse, err := dto.AnswerResponseFromModel(answer)
+	if err != nil {
+		response.WithError(c, http.StatusInternalServerError, "Failed to process answer data", err.Error())
+		return
 	}
 
 	response.WithSuccess(c, http.StatusOK, response.MessageFetched, map[string]interface{}{

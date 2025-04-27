@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/repository"
@@ -12,10 +13,13 @@ import (
 
 // answerServiceImpl implements AnswerService interface
 type answerServiceImpl struct {
-	answerRepo      repository.AnswerRepository
-	questionRepo    repository.QuestionRepository
-	participantRepo repository.ParticipantRepository
-	wsHub           *websocket.RedisHub
+	answerRepo         repository.AnswerRepository
+	questionRepo       repository.QuestionRepository
+	participantRepo    repository.ParticipantRepository
+	quizRepo           repository.QuizRepository
+	leaderboardService LeaderboardService
+	questionOptionRepo repository.QuestionOptionRepository
+	wsHub              *websocket.RedisHub
 }
 
 // NewAnswerService creates a new answer service
@@ -23,102 +27,152 @@ func NewAnswerService(
 	answerRepo repository.AnswerRepository,
 	questionRepo repository.QuestionRepository,
 	participantRepo repository.ParticipantRepository,
+	quizRepo repository.QuizRepository,
+	leaderboardService LeaderboardService,
+	questionOptionRepo repository.QuestionOptionRepository,
 	wsHub *websocket.RedisHub,
 ) AnswerService {
 	return &answerServiceImpl{
-		answerRepo:      answerRepo,
-		questionRepo:    questionRepo,
-		participantRepo: participantRepo,
-		wsHub:           wsHub,
+		answerRepo:         answerRepo,
+		questionRepo:       questionRepo,
+		participantRepo:    participantRepo,
+		quizRepo:           quizRepo,
+		leaderboardService: leaderboardService,
+		questionOptionRepo: questionOptionRepo,
+		wsHub:              wsHub,
 	}
 }
 
 // SubmitAnswer records a participant's answer to a question
-func (s *answerServiceImpl) SubmitAnswer(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID, selectedOption string) (*model.Answer, error) {
-	// Validate option format
-	if selectedOption != "A" && selectedOption != "B" && selectedOption != "C" && selectedOption != "D" {
-		return nil, errors.New("invalid option selected")
-	}
-
-	// Check if participant exists
-	participant, err := s.participantRepo.GetParticipantByID(ctx, participantID)
+func (s *answerServiceImpl) SubmitAnswer(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID, selectedOptionIDs []string) (*model.Answer, error) {
+	// Verify participant exists
+	_, err := s.participantRepo.GetParticipantByID(ctx, participantID)
 	if err != nil {
 		return nil, errors.New("participant not found")
 	}
 
-	// Get the question
+	// Verify question exists
 	question, err := s.questionRepo.GetQuestionByID(ctx, questionID)
 	if err != nil {
 		return nil, errors.New("question not found")
 	}
 
-	// Check if answer already submitted
+	// Get quiz session
+	session, err := s.quizRepo.GetQuizSession(ctx, question.QuizID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if this question is active
+	if session.CurrentQuestionID == nil || *session.CurrentQuestionID != questionID {
+		return nil, errors.New("question is not active")
+	}
+
+	// Check if participant has already answered this question
 	existingAnswer, err := s.answerRepo.GetAnswerByParticipantAndQuestion(ctx, participantID, questionID)
 	if err == nil && existingAnswer != nil {
-		return nil, errors.New("answer already submitted")
+		return nil, errors.New("already answered this question")
 	}
 
 	// Calculate time taken
-	// In a real system, we'd store the question start time in Redis or database
-	// For now, we'll just use a simplified approach
-	timeTaken := 0.0 // This would normally be calculated based on question start time
-
-	// Check if answer is correct
-	isCorrect := selectedOption == question.CorrectAnswer
-
-	// Calculate score (simple scoring - correct answer gets full points)
-	// In a more sophisticated system, score could be weighted by time taken
-	score := 0
-	if isCorrect {
-		score = 100
+	var timeTaken float64
+	if session.CurrentQuestionStartedAt != nil {
+		timeTaken = time.Since(*session.CurrentQuestionStartedAt).Seconds()
 	}
 
-	// Create answer record
-	answer := model.NewAnswer(participantID, questionID, selectedOption, timeTaken, isCorrect)
-	answer.Score = score
+	// Validate selected options against question type
+	if len(selectedOptionIDs) == 0 {
+		return nil, errors.New("no option selected")
+	}
 
-	// Save to database
+	// For single choice questions, ensure only one option is selected
+	if question.QuestionType == model.QuestionTypeSingleChoice && len(selectedOptionIDs) > 1 {
+		return nil, errors.New("only one option can be selected for single choice questions")
+	}
+
+	// Check if options are valid
+	optionMap := make(map[string]bool)
+	for _, opt := range question.Options {
+		optionMap[opt.ID.String()] = true
+	}
+
+	for _, optID := range selectedOptionIDs {
+		if !optionMap[optID] {
+			return nil, errors.New("invalid option selected")
+		}
+	}
+
+	// Check if answer is correct (using Question.IsCorrectAnswer method)
+	isCorrect := question.IsCorrectAnswer(selectedOptionIDs)
+
+	// Create and save the answer
+	answer, err := model.NewAnswer(participantID, questionID, selectedOptionIDs, timeTaken, isCorrect)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := s.answerRepo.CreateAnswer(ctx, answer); err != nil {
 		return nil, err
 	}
 
-	// Update participant's total score
-	if err := s.participantRepo.UpdateParticipantScore(ctx, participantID, score); err != nil {
-		return nil, err
-	}
+	// Update participant's score
+	if isCorrect {
+		// Calculate a time-based bonus
+		timeBonus := 0
+		if timeTaken < float64(question.TimeLimit)/2 {
+			// If answered in less than half the time limit, award a bonus
+			timeBonus = 20
+		}
+		totalScore := answer.Score + timeBonus
 
-	// Notify participant of answer receipt
-	s.wsHub.SendToClient(participantID, participant.QuizID, websocket.Event{
-		Type: websocket.EventAnswerReceived,
-		Payload: map[string]interface{}{
-			"questionId":     questionID.String(),
-			"selectedOption": selectedOption,
-			"isCorrect":      isCorrect,
-			"score":          score,
-		},
-	})
+		if err := s.leaderboardService.UpdateParticipantScore(ctx, participantID, totalScore); err != nil {
+			// Log the error but continue (non-critical failure)
+			// In a real app, we would use a proper logger
+			// logger.Error("Failed to update participant score", "error", err)
+		}
+	}
 
 	return answer, nil
 }
 
 // GetAnswerStats retrieves statistics for answers to a question
 func (s *answerServiceImpl) GetAnswerStats(ctx context.Context, questionID uuid.UUID) (map[string]int, error) {
+	// Get the question to retrieve options
+	question, err := s.questionRepo.GetQuestionByID(ctx, questionID)
+	if err != nil {
+		return nil, errors.New("question not found")
+	}
+
+	// We need to load the options for this question
+	options, err := s.questionOptionRepo.GetQuestionOptionsByQuestionID(ctx, questionID)
+	if err != nil {
+		return nil, err
+	}
+	question.Options = options
+
 	// Get all answers for the question
 	answers, err := s.answerRepo.GetAnswersByQuestionID(ctx, questionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Count occurrences of each option
-	stats := map[string]int{
-		"A": 0,
-		"B": 0,
-		"C": 0,
-		"D": 0,
+	// Initialize stats with all available option IDs
+	stats := make(map[string]int)
+	for _, option := range question.Options {
+		stats[option.ID.String()] = 0
 	}
 
+	// Count occurrences of each option selection
 	for _, answer := range answers {
-		stats[answer.SelectedOption]++
+		selectedOptions, err := answer.GetSelectedOptions()
+		if err != nil {
+			continue // Skip this answer if there's an error
+		}
+
+		// For multiple choice, each selected option counts as one selection
+		for _, optionID := range selectedOptions {
+			stats[optionID]++
+		}
 	}
 
 	return stats, nil

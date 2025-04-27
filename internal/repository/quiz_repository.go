@@ -191,6 +191,65 @@ func (r *PostgresQuizRepository) UpdateQuizStatus(ctx context.Context, id uuid.U
 	return nil
 }
 
+// UpdateQuiz updates a quiz's title and description
+func (r *PostgresQuizRepository) UpdateQuiz(ctx context.Context, quiz *model.Quiz) error {
+	query := `
+		UPDATE quizzes
+		SET title = $1, description = $2, updated_at = $3
+		WHERE id = $4
+	`
+
+	result, err := r.db.ExecContext(
+		ctx,
+		query,
+		quiz.Title,
+		quiz.Description,
+		time.Now(),
+		quiz.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("quiz not found")
+	}
+
+	return nil
+}
+
+// DeleteQuiz deletes a quiz and all its related data
+func (r *PostgresQuizRepository) DeleteQuiz(ctx context.Context, id uuid.UUID) error {
+	// Due to the ON DELETE CASCADE constraints set up in the database,
+	// deleting a quiz will automatically delete all related questions, participants, answers,
+	// and the quiz session.
+	query := `
+		DELETE FROM quizzes
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("quiz not found")
+	}
+
+	return nil
+}
+
 // CreateQuizSession creates a new quiz session
 func (r *PostgresQuizRepository) CreateQuizSession(ctx context.Context, session *model.QuizSession) error {
 	query := `

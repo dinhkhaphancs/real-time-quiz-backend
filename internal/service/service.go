@@ -33,12 +33,21 @@ type QuizService interface {
 
 	// GetQuizSession retrieves the current state of a quiz
 	GetQuizSession(ctx context.Context, quizID uuid.UUID) (*model.QuizSession, error)
+
+	// UpdateQuiz updates an existing quiz's basic info
+	UpdateQuiz(ctx context.Context, quizID uuid.UUID, title string, description string) (*model.Quiz, error)
+
+	// UpdateQuizWithQuestions updates an existing quiz with its questions
+	UpdateQuizWithQuestions(ctx context.Context, quizID uuid.UUID, title string, description string, questions []dto.QuestionUpdateData) (*model.Quiz, error)
+
+	// DeleteQuiz deletes a quiz and all its related data
+	DeleteQuiz(ctx context.Context, quizID uuid.UUID) error
 }
 
 // QuestionService defines operations for question business logic
 type QuestionService interface {
 	// AddQuestion adds a question to a quiz
-	AddQuestion(ctx context.Context, quizID uuid.UUID, text string, options []model.Option, correctAnswer string, timeLimit int) (*model.Question, error)
+	AddQuestion(ctx context.Context, quizID uuid.UUID, text string, options []dto.OptionCreateData, questionType string, timeLimit int) (*model.Question, error)
 
 	// GetQuestions retrieves all questions for a quiz
 	GetQuestions(ctx context.Context, quizID uuid.UUID) ([]*model.Question, error)
@@ -59,7 +68,7 @@ type QuestionService interface {
 // AnswerService defines operations for answer business logic
 type AnswerService interface {
 	// SubmitAnswer records a participant's answer to a question
-	SubmitAnswer(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID, selectedOption string) (*model.Answer, error)
+	SubmitAnswer(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID, selectedOptions []string) (*model.Answer, error)
 
 	// GetAnswerStats retrieves statistics for answers to a question
 	GetAnswerStats(ctx context.Context, questionID uuid.UUID) (map[string]int, error)

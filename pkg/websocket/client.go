@@ -84,8 +84,9 @@ type ClientMessage struct {
 
 // AnswerPayload represents a client's answer to a question
 type AnswerPayload struct {
-	QuestionID     string `json:"questionId"`
-	SelectedOption string `json:"selectedOption"`
+	QuestionID      string   `json:"questionId"`
+	SelectedOptions []string `json:"selectedOptions"`
+	TimeTaken       float64  `json:"timeTaken"`
 }
 
 // Event represents a WebSocket event message
@@ -182,6 +183,12 @@ func (c *Client) ReadPump() {
 				continue
 			}
 
+			// Validate the answer payload
+			if len(answerPayload.SelectedOptions) == 0 {
+				log.Printf("No options selected in answer: %s", c.UserID)
+				continue
+			}
+
 			// Convert questionId string to UUID
 			questionID, err := uuid.Parse(answerPayload.QuestionID)
 			if err != nil {
@@ -190,13 +197,13 @@ func (c *Client) ReadPump() {
 			}
 
 			// Publish answer event to Redis
-			// This would typically be processed by a message handler service
 			event := Event{
 				Type: "CLIENT_ANSWER",
 				Payload: map[string]interface{}{
-					"participantId":  c.UserID.String(),
-					"questionId":     questionID.String(),
-					"selectedOption": answerPayload.SelectedOption,
+					"participantId":   c.UserID.String(),
+					"questionId":      questionID.String(),
+					"selectedOptions": answerPayload.SelectedOptions,
+					"timeTaken":       answerPayload.TimeTaken,
 				},
 			}
 
@@ -207,8 +214,9 @@ func (c *Client) ReadPump() {
 			confirmEvent := Event{
 				Type: EventAnswerReceived,
 				Payload: map[string]interface{}{
-					"questionId":     questionID.String(),
-					"selectedOption": answerPayload.SelectedOption,
+					"questionId":      questionID.String(),
+					"selectedOptions": answerPayload.SelectedOptions,
+					"timeTaken":       answerPayload.TimeTaken,
 				},
 			}
 			c.Hub.SendToClient(c.UserID, c.QuizID, confirmEvent)

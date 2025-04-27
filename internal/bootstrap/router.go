@@ -67,6 +67,8 @@ func setupRoutes(router *gin.Engine, handlers *Handlers, jwtManager *auth.JWTMan
 			quizPrivate.GET("/my", handlers.QuizHandler.GetCurrentUserQuizzes)
 			quizPrivate.GET("/:id", handlers.QuizHandler.GetQuiz)
 			quizPrivate.POST("", handlers.QuizHandler.CreateQuiz)
+			quizPrivate.PUT("/:id", handlers.QuizHandler.UpdateQuiz)
+			quizPrivate.DELETE("/:id", handlers.QuizHandler.DeleteQuiz)
 			quizPrivate.POST("/:id/start", handlers.QuizHandler.StartQuiz)
 			quizPrivate.POST("/:id/end", handlers.QuizHandler.EndQuiz)
 		}

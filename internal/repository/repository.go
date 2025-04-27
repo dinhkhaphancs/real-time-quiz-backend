@@ -32,6 +32,12 @@ type QuizRepository interface {
 
 	// UpdateQuizSession updates a quiz session
 	UpdateQuizSession(ctx context.Context, session *model.QuizSession) error
+
+	// UpdateQuiz updates a quiz's title and description
+	UpdateQuiz(ctx context.Context, quiz *model.Quiz) error
+
+	// DeleteQuiz deletes a quiz and all its related data
+	DeleteQuiz(ctx context.Context, id uuid.UUID) error
 }
 
 // QuestionRepository defines operations for question management
@@ -47,6 +53,30 @@ type QuestionRepository interface {
 
 	// GetNextQuestion retrieves the next question after the current one
 	GetNextQuestion(ctx context.Context, quizID uuid.UUID, currentOrder int) (*model.Question, error)
+
+	// UpdateQuestion updates an existing question
+	UpdateQuestion(ctx context.Context, question *model.Question) error
+
+	// DeleteQuestion deletes a question
+	DeleteQuestion(ctx context.Context, id uuid.UUID) error
+}
+
+// QuestionOptionRepository defines operations for question option management
+type QuestionOptionRepository interface {
+	// CreateQuestionOption creates a new question option
+	CreateQuestionOption(ctx context.Context, option *model.QuestionOption) error
+
+	// GetQuestionOptionsByQuestionID retrieves all options for a question
+	GetQuestionOptionsByQuestionID(ctx context.Context, questionID uuid.UUID) ([]*model.QuestionOption, error)
+
+	// UpdateQuestionOption updates an existing question option
+	UpdateQuestionOption(ctx context.Context, option *model.QuestionOption) error
+
+	// DeleteQuestionOption deletes a question option
+	DeleteQuestionOption(ctx context.Context, id uuid.UUID) error
+
+	// DeleteQuestionOptionsByQuestionID deletes all options for a question
+	DeleteQuestionOptionsByQuestionID(ctx context.Context, questionID uuid.UUID) error
 }
 
 // UserRepository defines operations for user management

@@ -16,6 +16,22 @@ type QuizCreateRequest struct {
 	Questions   []QuestionCreateData `json:"questions" binding:"required"`
 }
 
+// QuizUpdateRequest represents the request to update an existing quiz
+type QuizUpdateRequest struct {
+	ID          string               `json:"id" binding:"required"`
+	Title       string               `json:"title" binding:"required"`
+	Description string               `json:"description"`
+	Questions   []QuestionUpdateData `json:"questions"`
+}
+
+// OptionData represents an option for updating a question
+type OptionData struct {
+	ID           *string `json:"id"`
+	Text         string  `json:"text" binding:"required"`
+	IsCorrect    bool    `json:"isCorrect"`
+	DisplayOrder int     `json:"displayOrder"`
+}
+
 // QuizResponse represents a quiz in API responses
 type QuizResponse struct {
 	ID          uuid.UUID `json:"id"`

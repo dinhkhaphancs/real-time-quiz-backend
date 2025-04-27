@@ -109,9 +109,10 @@ erDiagram
     QUIZ {
         uuid id PK
         string title
+        string description
         uuid creator_id FK
-        enum status
-        string code UNIQUE
+        string status
+        string code UK
         timestamp created_at
         timestamp updated_at
     }
@@ -120,13 +121,19 @@ erDiagram
         uuid id PK
         uuid quiz_id FK
         string content
-        string option_a
-        string option_b
-        string option_c
-        string option_d
-        string correct_option
+        string question_type
         int order
         int time_limit
+        timestamp created_at
+    }
+    
+    QUESTION_OPTION {
+        uuid id PK
+        uuid question_id FK
+        string text
+        boolean is_correct
+        int display_order
+        timestamp created_at
     }
     
     PARTICIPANT {
@@ -141,15 +148,22 @@ erDiagram
         uuid id PK
         uuid question_id FK
         uuid participant_id FK
-        string selected_option
+        uuid option_id FK
         int score
         timestamp submitted_at
     }
     
+    MULTIPLE_ANSWER {
+        uuid id PK
+        uuid answer_id FK
+        uuid option_id FK
+    }
+    
     QUIZ_SESSION {
-        uuid quiz_id PK
+        uuid id PK
+        uuid quiz_id FK
         uuid current_question_id FK
-        enum status
+        string status
         timestamp started_at
         timestamp ended_at
         timestamp current_question_started_at
@@ -157,9 +171,13 @@ erDiagram
     
     USER ||--o{ QUIZ : creates
     QUIZ ||--o{ QUESTION : contains
+    QUESTION ||--o{ QUESTION_OPTION : has
     QUIZ ||--o{ PARTICIPANT : joins
     PARTICIPANT ||--o{ ANSWER : submits
     QUESTION ||--o{ ANSWER : has
+    ANSWER ||--o{ MULTIPLE_ANSWER : contains
+    QUESTION_OPTION ||--o{ MULTIPLE_ANSWER : references
+    QUESTION_OPTION ||--o{ ANSWER : references
     QUIZ ||--|| QUIZ_SESSION : tracks
 ```
 
@@ -351,6 +369,88 @@ Response:
 
 The existing participant API endpoints (`/api/v1/participants/*`) remain unchanged as they operate using UUIDs for internal consistency.
 
+## Dynamic Options and Multiple Choice Questions
+
+The application now supports both dynamic question options and multiple choice questions, providing more flexibility in quiz creation and answering.
+
+### Dynamic Options
+
+Instead of being limited to fixed options (A, B, C, D), quiz creators can now:
+
+1. **Add any number of custom options** to questions
+2. **Customize option text** with arbitrary content
+3. **Set display order** for options to control presentation
+4. **Mark any option as correct** (for single choice questions)
+5. **Mark multiple options as correct** (for multiple choice questions)
+
+### Question Types
+
+The system supports two types of questions:
+
+1. **Single Choice Questions** (`SINGLE_CHOICE`):
+   - Participants select exactly one answer
+   - Only one option can be marked as correct
+   - Answers are scored as either correct (full points) or incorrect (no points)
+
+2. **Multiple Choice Questions** (`MULTIPLE_CHOICE`):
+   - Participants can select multiple answers
+   - Multiple options can be marked as correct
+   - For a correct score, participants must select ALL correct options and NO incorrect options
+
+### Implementation Details
+
+1. **Database Changes**:
+   - Added `question_type` column to the `questions` table
+   - Created a new `question_options` table with columns for:
+     - `id`: Unique identifier
+     - `question_id`: Reference to the parent question
+     - `text`: The option text
+     - `is_correct`: Boolean indicating if this is a correct option
+     - `display_order`: Integer for controlling option order
+   - The original fixed option columns are marked as deprecated
+
+2. **API Changes**:
+   - When creating questions, you can now specify:
+     - Question type: `SINGLE_CHOICE` or `MULTIPLE_CHOICE`
+     - An array of options with text and correct status
+   - When submitting answers, participants can provide an array of selected option IDs
+
+3. **Answer Validation**:
+   - For single choice: Exactly one option must be selected, and it must be correct
+   - For multiple choice: All correct options must be selected, and no incorrect options
+
+### Example API Usage
+
+**Creating a question with dynamic options**:
+```json
+{
+  "text": "Which of the following are planets in our solar system?",
+  "questionType": "MULTIPLE_CHOICE",
+  "timeLimit": 30,
+  "options": [
+    {"text": "Earth", "isCorrect": true},
+    {"text": "Saturn", "isCorrect": true},
+    {"text": "Sun", "isCorrect": false},
+    {"text": "Moon", "isCorrect": false},
+    {"text": "Neptune", "isCorrect": true}
+  ]
+}
+```
+
+**Submitting an answer to a multiple choice question**:
+```json
+{
+  "questionId": "550e8400-e29b-41d4-a716-446655440000",
+  "selectedOptionIds": [
+    "550e8400-e29b-41d4-a716-446655440001",
+    "550e8400-e29b-41d4-a716-446655440002",
+    "550e8400-e29b-41d4-a716-446655440005"
+  ]
+}
+```
+
+These enhancements make the quiz application more versatile, allowing for more complex and educational question types beyond simple single-choice questions.
+
 ## Database Migrations
 
 This project uses [golang-migrate](https://github.com/golang-migrate/migrate) to manage database schema changes. We've implemented a structured approach to ensure your database stays in sync with the codebase.
@@ -456,6 +556,7 @@ command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" 
 - ✅ Added quiz joining by code feature (participants can now join using a 6-character code instead of UUID)
 - ✅ Added quiz description support for more detailed quiz information
 - ✅ Enhanced quiz creation to support creating quizzes with questions in a single API call
+- ✅ Implemented support for dynamic options and multiple choice questions
 
 ### Current Implementation Status
 
@@ -474,6 +575,8 @@ command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" 
 - ✅ Real-time notifications when participants join or leave
 - ✅ Bootstrap pattern implementation for improved code organization
 - ✅ Modular API structure organized by domain with clear public/private route separation
+- ✅ Dynamic options support with ability to add custom options to questions
+- ✅ Multiple choice questions that allow selecting multiple correct answers
 
 ### Standardized Response Pattern
 

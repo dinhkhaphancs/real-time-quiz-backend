@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/repository"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/websocket"
@@ -19,72 +21,116 @@ var (
 	ErrInvalidOption    = errors.New("invalid option selected")
 )
 
-// questionService implements QuestionService interface
-type questionService struct {
-	quizRepo     repository.QuizRepository
-	questionRepo repository.QuestionRepository
-	wsHub        *websocket.RedisHub
+// questionServiceImpl implements QuestionService interface
+type questionServiceImpl struct {
+	quizRepo           repository.QuizRepository
+	questionRepo       repository.QuestionRepository
+	questionOptionRepo repository.QuestionOptionRepository
+	wsHub              *websocket.RedisHub
 }
 
 // NewQuestionService creates a new question service
 func NewQuestionService(
 	quizRepo repository.QuizRepository,
 	questionRepo repository.QuestionRepository,
+	questionOptionRepo repository.QuestionOptionRepository,
 	wsHub *websocket.RedisHub,
 ) QuestionService {
-	return &questionService{
-		quizRepo:     quizRepo,
-		questionRepo: questionRepo,
-		wsHub:        wsHub,
+	return &questionServiceImpl{
+		quizRepo:           quizRepo,
+		questionRepo:       questionRepo,
+		questionOptionRepo: questionOptionRepo,
+		wsHub:              wsHub,
 	}
 }
 
 // AddQuestion adds a question to a quiz
-func (s *questionService) AddQuestion(ctx context.Context, quizID uuid.UUID, text string, options []model.Option, correctAnswer string, timeLimit int) (*model.Question, error) {
+func (s *questionServiceImpl) AddQuestion(ctx context.Context, quizID uuid.UUID, text string, options []dto.OptionCreateData, questionType string, timeLimit int) (*model.Question, error) {
 	// Validate inputs
 	if text == "" {
 		return nil, errors.New("question text is required")
 	}
-	if len(options) != 4 {
-		return nil, errors.New("question must have exactly 4 options")
-	}
-	if correctAnswer == "" || (correctAnswer != "A" && correctAnswer != "B" && correctAnswer != "C" && correctAnswer != "D") {
-		return nil, errors.New("correct answer must be A, B, C, or D")
-	}
-	if timeLimit <= 0 {
-		return nil, errors.New("time limit must be positive")
+
+	if len(options) < 2 {
+		return nil, errors.New("question must have at least 2 options")
 	}
 
-	// Get the quiz to check existence and status
-	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
+	// Validate question type
+	var qType model.QuestionType
+	switch questionType {
+	case string(model.QuestionTypeSingleChoice):
+		qType = model.QuestionTypeSingleChoice
+	case string(model.QuestionTypeMultipleChoice):
+		qType = model.QuestionTypeMultipleChoice
+	default:
+		return nil, errors.New("invalid question type")
+	}
+
+	// Check if quiz exists
+	_, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
-		return nil, ErrQuizNotFound
+		return nil, errors.New("quiz not found")
 	}
 
-	// Only allow adding questions to quizzes in WAITING state
-	if quiz.Status != model.QuizStatusWaiting {
-		return nil, errors.New("cannot add questions to a quiz that has already started")
-	}
-
-	// Get existing questions to determine order
-	questions, err := s.questionRepo.GetQuestionsByQuizID(ctx, quizID)
+	// Get the current count of questions for this quiz to determine order
+	existingQuestions, err := s.questionRepo.GetQuestionsByQuizID(ctx, quizID)
 	if err != nil {
 		return nil, err
 	}
+	order := len(existingQuestions) + 1
 
-	// Create new question with next order number
-	question := model.NewQuestion(quizID, text, options, correctAnswer, timeLimit, len(questions)+1)
+	// Create the question
+	question := model.NewQuestion(quizID, text, qType, timeLimit, order)
 
 	// Save to database
 	if err := s.questionRepo.CreateQuestion(ctx, question); err != nil {
 		return nil, err
 	}
 
-	return question, nil
+	// For single choice questions, ensure only one option is marked as correct
+	if qType == model.QuestionTypeSingleChoice {
+		correctCount := 0
+		for _, opt := range options {
+			if opt.IsCorrect {
+				correctCount++
+			}
+		}
+		if correctCount != 1 {
+			return nil, errors.New("single choice questions must have exactly one correct option")
+		}
+	} else {
+		// For multiple choice, ensure at least one option is correct
+		correctCount := 0
+		for _, opt := range options {
+			if opt.IsCorrect {
+				correctCount++
+			}
+		}
+		if correctCount < 1 {
+			return nil, errors.New("multiple choice questions must have at least one correct option")
+		}
+	}
+
+	// Create options for the question
+	for i, optData := range options {
+		option := model.NewQuestionOption(
+			question.ID,
+			optData.Text,
+			optData.IsCorrect,
+			i+1, // display order based on position in array
+		)
+
+		if err := s.questionOptionRepo.CreateQuestionOption(ctx, option); err != nil {
+			return nil, err
+		}
+	}
+
+	// Fetch the complete question with options
+	return s.GetQuestion(ctx, question.ID)
 }
 
 // GetQuestions retrieves all questions for a quiz
-func (s *questionService) GetQuestions(ctx context.Context, quizID uuid.UUID) ([]*model.Question, error) {
+func (s *questionServiceImpl) GetQuestions(ctx context.Context, quizID uuid.UUID) ([]*model.Question, error) {
 	// Check if quiz exists
 	_, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -97,20 +143,38 @@ func (s *questionService) GetQuestions(ctx context.Context, quizID uuid.UUID) ([
 		return nil, err
 	}
 
+	// Load options for each question
+	for _, question := range questions {
+		options, err := s.questionOptionRepo.GetQuestionOptionsByQuestionID(ctx, question.ID)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("Options: ", options)
+		question.Options = options
+	}
+
 	return questions, nil
 }
 
 // GetQuestion retrieves a question by ID
-func (s *questionService) GetQuestion(ctx context.Context, id uuid.UUID) (*model.Question, error) {
+func (s *questionServiceImpl) GetQuestion(ctx context.Context, id uuid.UUID) (*model.Question, error) {
 	question, err := s.questionRepo.GetQuestionByID(ctx, id)
 	if err != nil {
 		return nil, ErrQuestionNotFound
 	}
+
+	// Load options for the question
+	options, err := s.questionOptionRepo.GetQuestionOptionsByQuestionID(ctx, question.ID)
+	if err != nil {
+		return nil, err
+	}
+	question.Options = options
+
 	return question, nil
 }
 
 // StartQuestion starts a specific question in a quiz
-func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error {
+func (s *questionServiceImpl) StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error {
 	// Check if quiz exists and is active
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -121,7 +185,7 @@ func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, q
 	}
 
 	// Check if question exists and belongs to this quiz
-	question, err := s.questionRepo.GetQuestionByID(ctx, questionID)
+	question, err := s.GetQuestion(ctx, questionID) // Use GetQuestion to load options
 	if err != nil {
 		return ErrQuestionNotFound
 	}
@@ -151,34 +215,50 @@ func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, q
 	}
 	totalCount := len(questions)
 
+	// Convert options to a format suitable for broadcasting
+	options := make([]map[string]interface{}, len(question.Options))
+	for i, opt := range question.Options {
+		options[i] = map[string]interface{}{
+			"id":   opt.ID.String(),
+			"text": opt.Text,
+		}
+	}
+
 	// Different payloads for creators and participants
-	// For creators (quiz admins), send full question details
+	// For creators (quiz admins), send full question details including correct answers
+	creatorOptions := make([]map[string]interface{}, len(question.Options))
+	for i, opt := range question.Options {
+		creatorOptions[i] = map[string]interface{}{
+			"id":        opt.ID.String(),
+			"text":      opt.Text,
+			"isCorrect": opt.IsCorrect,
+		}
+	}
+
 	s.wsHub.PublishToCreators(quizID, websocket.Event{
 		Type: websocket.EventQuestionStart,
 		Payload: map[string]interface{}{
-			"questionId": question.ID.String(),
-			"text":       question.Text,
-			"options":    question.GetOptions(),
-			"timeLimit":  question.TimeLimit,
-			"order":      question.Order,
-			"totalCount": totalCount,
+			"questionId":   question.ID.String(),
+			"text":         question.Text,
+			"options":      creatorOptions,
+			"questionType": string(question.QuestionType),
+			"timeLimit":    question.TimeLimit,
+			"order":        question.Order,
+			"totalCount":   totalCount,
 		},
 	})
 
-	// For participants, send options without text and correct answer
+	// For participants, send options without correct answer information
 	s.wsHub.PublishToParticipants(quizID, websocket.Event{
 		Type: websocket.EventQuestionStart,
 		Payload: map[string]interface{}{
-			"questionId": question.ID.String(),
-			"options": []map[string]string{
-				{"key": "A"},
-				{"key": "B"},
-				{"key": "C"},
-				{"key": "D"},
-			},
-			"timeLimit":  question.TimeLimit,
-			"order":      question.Order,
-			"totalCount": totalCount,
+			"questionId":   question.ID.String(),
+			"text":         question.Text,
+			"options":      options,
+			"questionType": string(question.QuestionType),
+			"timeLimit":    question.TimeLimit,
+			"order":        question.Order,
+			"totalCount":   totalCount,
 		},
 	})
 
@@ -202,7 +282,7 @@ func (s *questionService) StartQuestion(ctx context.Context, quizID uuid.UUID, q
 }
 
 // EndQuestion ends the current question in a quiz
-func (s *questionService) EndQuestion(ctx context.Context, quizID uuid.UUID) error {
+func (s *questionServiceImpl) EndQuestion(ctx context.Context, quizID uuid.UUID) error {
 	// Check if quiz exists and is active
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -222,18 +302,26 @@ func (s *questionService) EndQuestion(ctx context.Context, quizID uuid.UUID) err
 		return errors.New("no active question to end")
 	}
 
-	// Get question details
-	question, err := s.questionRepo.GetQuestionByID(ctx, *session.CurrentQuestionID)
+	// Get question details with options
+	question, err := s.GetQuestion(ctx, *session.CurrentQuestionID)
 	if err != nil {
 		return ErrQuestionNotFound
 	}
 
-	// Broadcast question end event with correct answer
+	// Get correct options to send in the event
+	correctOptions := question.GetCorrectOptions()
+	correctOptionIds := make([]string, len(correctOptions))
+	for i, opt := range correctOptions {
+		correctOptionIds[i] = opt.ID.String()
+	}
+
+	// Broadcast question end event with correct answers
 	s.wsHub.BroadcastToQuiz(quizID, websocket.Event{
 		Type: websocket.EventQuestionEnd,
 		Payload: map[string]interface{}{
-			"questionId":    question.ID.String(),
-			"correctAnswer": question.CorrectAnswer,
+			"questionId":       question.ID.String(),
+			"correctOptionIds": correctOptionIds,
+			"questionType":     string(question.QuestionType),
 		},
 	})
 
@@ -249,7 +337,7 @@ func (s *questionService) EndQuestion(ctx context.Context, quizID uuid.UUID) err
 }
 
 // GetNextQuestion retrieves the next question in sequence
-func (s *questionService) GetNextQuestion(ctx context.Context, quizID uuid.UUID) (*model.Question, error) {
+func (s *questionServiceImpl) GetNextQuestion(ctx context.Context, quizID uuid.UUID) (*model.Question, error) {
 	// Check if quiz exists and is active
 	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
 	if err != nil {
@@ -276,14 +364,21 @@ func (s *questionService) GetNextQuestion(ctx context.Context, quizID uuid.UUID)
 		}
 
 		// Find question with order 1
+		var firstQuestion *model.Question
 		for _, q := range questions {
 			if q.Order == 1 {
-				return q, nil
+				firstQuestion = q
+				break
 			}
 		}
 
-		// If no question with order 1, return the first in the list
-		return questions[0], nil
+		// If no question with order 1, use the first in the list
+		if firstQuestion == nil {
+			firstQuestion = questions[0]
+		}
+
+		// Load options for the first question
+		return s.GetQuestion(ctx, firstQuestion.ID)
 	}
 
 	// Get current question to determine order
@@ -298,5 +393,6 @@ func (s *questionService) GetNextQuestion(ctx context.Context, quizID uuid.UUID)
 		return nil, ErrNoQuestions
 	}
 
-	return nextQuestion, nil
+	// Load options for the next question
+	return s.GetQuestion(ctx, nextQuestion.ID)
 }
