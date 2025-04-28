@@ -120,12 +120,15 @@ type Client struct {
 
 	// Context for cancellation
 	Ctx context.Context
+
+	// Cancel function to clean up the context
+	Cancel context.CancelFunc
 }
 
 // IncomingMessage represents a message received from the client
 type IncomingMessage struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // ReadPump pumps messages from the WebSocket connection to the hub
@@ -133,11 +136,16 @@ func (c *Client) ReadPump() {
 	defer func() {
 		c.Hub.GetUnregisterChan() <- c
 		c.Conn.Close()
+		if c.Cancel != nil {
+			c.Cancel()
+		}
+		log.Printf("Client disconnected: %s for quiz %s", c.UserID, c.QuizID)
 	}()
 
 	c.Conn.SetReadLimit(maxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.Conn.SetPongHandler(func(string) error {
+		log.Printf("Received pong from client: %s", c.UserID)
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
@@ -178,7 +186,7 @@ func (c *Client) ReadPump() {
 
 			// Process answer submission
 			var answerPayload AnswerPayload
-			if err := json.Unmarshal(incomingMsg.Data, &answerPayload); err != nil {
+			if err := json.Unmarshal(incomingMsg.Payload, &answerPayload); err != nil {
 				log.Printf("Error unmarshaling answer payload: %v", err)
 				continue
 			}
@@ -230,20 +238,30 @@ func (c *Client) WritePump() {
 	defer func() {
 		ticker.Stop()
 		c.Conn.Close()
+		if c.Cancel != nil {
+			c.Cancel()
+		}
+		log.Printf("WritePump terminated for client: %s", c.UserID)
 	}()
 
 	for {
 		select {
 		case message, ok := <-c.Send:
+			// Check if the hub is still sending messages
+			// log.Printf("Sending message to client: %s", c.UserID)
+			// log.Printf("Message: %s", string(message))
+
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel
+				log.Printf("Send channel closed for client: %s", c.UserID)
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
+				log.Printf("Error getting writer for client %s: %v", c.UserID, err)
 				return
 			}
 			w.Write(message)
@@ -256,14 +274,18 @@ func (c *Client) WritePump() {
 			}
 
 			if err := w.Close(); err != nil {
+				log.Printf("Error closing writer for client %s: %v", c.UserID, err)
 				return
 			}
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("Error sending ping to client %s: %v", c.UserID, err)
 				return
 			}
+			log.Printf("Sent ping to client: %s", c.UserID)
 		case <-c.Ctx.Done():
+			log.Printf("Context done for client: %s", c.UserID)
 			return
 		}
 	}

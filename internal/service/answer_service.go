@@ -63,10 +63,16 @@ func (s *answerServiceImpl) SubmitAnswer(ctx context.Context, participantID uuid
 		return nil, err
 	}
 
-	// Check if this question is active
-	if session.CurrentQuestionID == nil || *session.CurrentQuestionID != questionID {
-		return nil, errors.New("question is not active")
+	// get question options
+	options, err := s.questionOptionRepo.GetQuestionOptionsByQuestionID(ctx, questionID)
+	if err != nil {
+		return nil, err
 	}
+
+	// Check if this question is active
+	// if session.CurrentQuestionID == nil || *session.CurrentQuestionID != questionID {
+	// 	return nil, errors.New("question is not active")
+	// }
 
 	// Check if participant has already answered this question
 	existingAnswer, err := s.answerRepo.GetAnswerByParticipantAndQuestion(ctx, participantID, questionID)
@@ -92,7 +98,7 @@ func (s *answerServiceImpl) SubmitAnswer(ctx context.Context, participantID uuid
 
 	// Check if options are valid
 	optionMap := make(map[string]bool)
-	for _, opt := range question.Options {
+	for _, opt := range options {
 		optionMap[opt.ID.String()] = true
 	}
 

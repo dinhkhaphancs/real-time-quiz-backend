@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
@@ -34,6 +35,7 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	// Parse participant ID from the request
 	participantID, err := uuid.Parse(request.ParticipantID)
 	if err != nil {
+		log.Printf("Error parsing participant ID: %v\n", err)
 		response.WithError(c, http.StatusBadRequest, "Invalid participant ID", "The provided participant ID is not valid")
 		return
 	}
@@ -41,6 +43,7 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	// Parse question ID from the request
 	questionID, err := uuid.Parse(request.QuestionID)
 	if err != nil {
+		log.Printf("Error parsing question ID: %v\n", err)
 		response.WithError(c, http.StatusBadRequest, "Invalid question ID", "The provided question ID is not valid")
 		return
 	}
@@ -48,6 +51,7 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	// Submit the answer
 	answer, err := h.answerService.SubmitAnswer(c, participantID, questionID, request.SelectedOptions)
 	if err != nil {
+		log.Printf("Error submitting answer: %v\n", err)
 		response.WithError(c, http.StatusBadRequest, "Failed to submit answer", err.Error())
 		return
 	}
@@ -55,6 +59,7 @@ func (h *AnswerHandler) SubmitAnswer(c *gin.Context) {
 	// Create a response using the updated DTO
 	answerResponse, err := dto.AnswerResponseFromModel(answer)
 	if err != nil {
+		log.Printf("Error processing answer data: %v\n", err)
 		response.WithError(c, http.StatusInternalServerError, "Failed to process answer data", err.Error())
 		return
 	}

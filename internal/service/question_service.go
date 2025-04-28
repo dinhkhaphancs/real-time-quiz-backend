@@ -238,6 +238,8 @@ func (s *questionServiceImpl) StartQuestion(ctx context.Context, quizID uuid.UUI
 	s.wsHub.PublishToCreators(quizID, websocket.Event{
 		Type: websocket.EventQuestionStart,
 		Payload: map[string]interface{}{
+			"quizId":       quiz.ID.String(),
+			"quizTitle":    quiz.Title,
 			"questionId":   question.ID.String(),
 			"text":         question.Text,
 			"options":      creatorOptions,
@@ -252,6 +254,8 @@ func (s *questionServiceImpl) StartQuestion(ctx context.Context, quizID uuid.UUI
 	s.wsHub.PublishToParticipants(quizID, websocket.Event{
 		Type: websocket.EventQuestionStart,
 		Payload: map[string]interface{}{
+			"quizId":       quiz.ID.String(),
+			"quizTitle":    quiz.Title,
 			"questionId":   question.ID.String(),
 			"text":         question.Text,
 			"options":      options,

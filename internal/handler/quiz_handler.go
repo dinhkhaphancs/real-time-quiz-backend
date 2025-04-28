@@ -263,9 +263,7 @@ func (h *QuizHandler) JoinQuiz(c *gin.Context) {
 	}
 
 	participantResponse := dto.ParticipantResponseFromModel(participant)
-	response.WithSuccess(c, http.StatusOK, "Successfully joined quiz", map[string]interface{}{
-		"participant": participantResponse,
-	})
+	response.WithSuccess(c, http.StatusOK, "Successfully joined quiz", participantResponse)
 }
 
 // JoinQuizByCode allows a user to join a quiz using a code
@@ -287,9 +285,7 @@ func (h *QuizHandler) JoinQuizByCode(c *gin.Context) {
 	}
 
 	participantResponse := dto.ParticipantResponseFromModel(participant)
-	response.WithSuccess(c, http.StatusOK, "Successfully joined quiz", map[string]interface{}{
-		"participant": participantResponse,
-	})
+	response.WithSuccess(c, http.StatusOK, "Successfully joined quiz", participantResponse)
 }
 
 // GetCurrentUserQuizzes retrieves all quizzes created by the authenticated user

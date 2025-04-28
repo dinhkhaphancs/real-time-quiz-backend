@@ -81,15 +81,6 @@ func (s *participantServiceImpl) JoinQuiz(ctx context.Context, quizID uuid.UUID,
 
 // JoinQuizByCode allows a user to join a quiz using its code
 func (s *participantServiceImpl) JoinQuizByCode(ctx context.Context, code string, name string) (*model.Participant, error) {
-	// Validate inputs
-	if name == "" {
-		return nil, errors.New("name is required")
-	}
-
-	if code == "" {
-		return nil, errors.New("code is required")
-	}
-
 	// Check if quiz exists and is in waiting state
 	quiz, err := s.quizRepo.GetQuizByCode(ctx, code)
 	if err != nil {

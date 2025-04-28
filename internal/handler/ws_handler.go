@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"log"
 	"net/http"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
@@ -48,6 +50,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	quizIDStr := c.Param("quizId")
 	quizID, err := uuid.Parse(quizIDStr)
 	if err != nil {
+		log.Printf("Error parsing quiz ID: %v\n", err)
 		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
 		return
 	}
@@ -57,6 +60,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
+		log.Printf("Error parsing ID: %v\n", err)
 		response.WithError(c, http.StatusBadRequest, "Invalid ID", "The provided user or participant ID is not valid")
 		return
 	}
@@ -70,6 +74,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		// Get user to validate
 		user, err := h.userService.GetUserByID(c, id)
 		if err != nil {
+			log.Printf("Error getting user: %v\n", err)
 			response.WithError(c, http.StatusUnauthorized, "Authentication failed", "User not found")
 			return
 		}
@@ -77,6 +82,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		// Check if user is the creator of this quiz
 		quiz, err := h.quizService.GetQuiz(c, quizID)
 		if err != nil {
+			log.Printf("Error getting quiz: %v\n", err)
 			response.WithError(c, http.StatusNotFound, "Quiz not found", "The specified quiz could not be found")
 			return
 		}
@@ -93,17 +99,20 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		// Get participant to validate
 		participant, err := h.participantService.GetParticipantByID(c, id)
 		if err != nil {
+			log.Printf("Error getting participant: %v\n", err)
 			response.WithError(c, http.StatusUnauthorized, "Authentication failed", "Participant not found")
 			return
 		}
 
 		if participant.QuizID != quizID {
+			log.Printf("Participant %s is not authorized for quiz %s\n", participant.ID, quizID)
 			response.WithError(c, http.StatusUnauthorized, "Authorization failed", "Participant not authorized for this quiz")
 			return
 		}
 
 		userName = participant.Name
 	} else {
+		log.Printf("Invalid connection type: %s\n", connectionType)
 		response.WithError(c, http.StatusBadRequest, "Invalid connection type", "Connection type must be 'user' or 'participant'")
 		return
 	}
@@ -111,12 +120,16 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	// Upgrade connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
+		log.Printf("Error upgrading connection: %v\n", err)
 		response.WithError(c, http.StatusInternalServerError, "Connection error", "Failed to upgrade connection to WebSocket")
 		return
 	}
 
 	// Create a client ID
 	clientID := uuid.New()
+
+	// Create a detached background context for the WebSocket connection
+	wsCtx, cancel := context.WithCancel(context.Background())
 
 	// Create a new client
 	client := &ws.Client{
@@ -126,12 +139,16 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		IsCreator: isCreator,
 		Conn:      conn,
 		Send:      make(chan []byte, 256),
+		Hub:       h.hub,
+		Ctx:       wsCtx,
+		Cancel:    cancel,
 	}
 
 	// Subscribe to Redis events for this quiz if not already subscribed
 	if err := h.hub.SubscribeToQuiz(quizID); err != nil {
 		response.WithError(c, http.StatusInternalServerError, "Subscription error", "Failed to subscribe to quiz events")
 		conn.Close()
+		cancel()
 		return
 	}
 
