@@ -14,6 +14,7 @@ type Handlers struct {
 	LeaderboardHandler *handler.LeaderboardHandler
 	WSHandler          *handler.WebSocketHandler
 	ParticipantHandler *handler.ParticipantHandler
+	StateHandler       *handler.StateHandler
 }
 
 // NewHandlers initializes all handlers
@@ -24,7 +25,8 @@ func NewHandlers(services *Services, wsHub *websocket.RedisHub) *Handlers {
 		QuestionHandler:    handler.NewQuestionHandler(services.QuestionService, services.QuizService),
 		AnswerHandler:      handler.NewAnswerHandler(services.AnswerService),
 		LeaderboardHandler: handler.NewLeaderboardHandler(services.LeaderboardService, services.QuizService),
-		WSHandler:          handler.NewWebSocketHandler(wsHub, services.QuizService, services.UserService, services.ParticipantService),
+		WSHandler:          handler.NewWebSocketHandler(wsHub, services.QuizService, services.UserService, services.ParticipantService, services.StateService),
 		ParticipantHandler: handler.NewParticipantHandler(services.ParticipantService, services.QuizService),
+		StateHandler:       handler.NewStateHandler(services.StateService),
 	}
 }

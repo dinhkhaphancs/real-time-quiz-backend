@@ -97,7 +97,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"title\": \"General Knowledge Quiz\",\n    \"description\": \"A quiz about various general knowledge topics\",\n    \"questions\": [\n        {\n            \"text\": \"What is the capital of France?\",\n            \"question_type\": \"SINGLE_CHOICE\",\n            \"options\": [\n                {\"text\": \"London\", \"is_correct\": false},\n                {\"text\": \"Berlin\", \"is_correct\": false},\n                {\"text\": \"Paris\", \"is_correct\": true},\n                {\"text\": \"Madrid\", \"is_correct\": false}\n            ],\n            \"timeLimit\": 20\n        },\n        {\n            \"text\": \"Which planets are in our solar system?\",\n            \"question_type\": \"MULTIPLE_CHOICE\",\n            \"options\": [\n                {\"text\": \"Venus\", \"is_correct\": true},\n                {\"text\": \"Mars\", \"is_correct\": true},\n                {\"text\": \"Pluto\", \"is_correct\": false},\n                {\"text\": \"Saturn\", \"is_correct\": true}\n            ],\n            \"timeLimit\": 30\n        }\n    ]\n}"
+              "raw": "{\n    \"title\": \"General Knowledge Quiz\",\n    \"description\": \"A quiz about various general knowledge topics\",\n    \"questions\": [\n        {\n            \"text\": \"What is the capital of France?\",\n            \"questionType\": \"SINGLE_CHOICE\",\n            \"options\": [\n                {\"text\": \"London\", \"isCorrect\": false, \"displayOrder\": 1},\n                {\"text\": \"Berlin\", \"isCorrect\": false, \"displayOrder\": 2},\n                {\"text\": \"Paris\", \"isCorrect\": true, \"displayOrder\": 3},\n                {\"text\": \"Madrid\", \"isCorrect\": false, \"displayOrder\": 4}\n            ],\n            \"timeLimit\": 20\n        },\n        {\n            \"text\": \"Which planets are in our solar system?\",\n            \"questionType\": \"MULTIPLE_CHOICE\",\n            \"options\": [\n                {\"text\": \"Venus\", \"isCorrect\": true, \"displayOrder\": 1},\n                {\"text\": \"Mars\", \"isCorrect\": true, \"displayOrder\": 2},\n                {\"text\": \"Pluto\", \"isCorrect\": false, \"displayOrder\": 3},\n                {\"text\": \"Saturn\", \"isCorrect\": true, \"displayOrder\": 4}\n            ],\n            \"timeLimit\": 30\n        }\n    ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/quizzes",
@@ -124,7 +124,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"title\": \"Updated Quiz Title\",\n    \"description\": \"Updated quiz description\"\n}"
+              "raw": "{\n    \"id\": \"{{quizId}}\",\n    \"title\": \"Updated Quiz Title\",\n    \"description\": \"Updated quiz description\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/quizzes/{{quizId}}",
@@ -328,13 +328,18 @@
           "name": "Remove Participant",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/participants/{{participantId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "participants", "{{participantId}}"]
             },
-            "description": "Remove a participant from a quiz. This can only be done if the quiz hasn't started yet. (public route)"
+            "description": "Remove a participant from a quiz. This can only be done if the quiz hasn't started yet. Requires JWT authentication."
           },
           "response": []
         }
@@ -359,7 +364,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"quizId\": \"{{quizId}}\",\n    \"text\": \"What is the capital of France?\",\n    \"question_type\": \"SINGLE_CHOICE\",\n    \"options\": [\n        {\"text\": \"London\", \"is_correct\": false},\n        {\"text\": \"Berlin\", \"is_correct\": false},\n        {\"text\": \"Paris\", \"is_correct\": true},\n        {\"text\": \"Madrid\", \"is_correct\": false}\n    ],\n    \"timeLimit\": 20\n}"
+              "raw": "{\n    \"quizId\": \"{{quizId}}\",\n    \"text\": \"What is the capital of France?\",\n    \"questionType\": \"SINGLE_CHOICE\",\n    \"options\": [\n        {\"text\": \"London\", \"isCorrect\": false, \"displayOrder\": 1},\n        {\"text\": \"Berlin\", \"isCorrect\": false, \"displayOrder\": 2},\n        {\"text\": \"Paris\", \"isCorrect\": true, \"displayOrder\": 3},\n        {\"text\": \"Madrid\", \"isCorrect\": false, \"displayOrder\": 4}\n    ],\n    \"timeLimit\": 20\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/questions",
@@ -386,7 +391,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"text\": \"Updated question text\",\n    \"question_type\": \"SINGLE_CHOICE\",\n    \"options\": [\n        {\"text\": \"Option 1\", \"is_correct\": false},\n        {\"text\": \"Option 2\", \"is_correct\": true},\n        {\"text\": \"Option 3\", \"is_correct\": false},\n        {\"text\": \"Option 4\", \"is_correct\": false}\n    ],\n    \"timeLimit\": 25\n}"
+              "raw": "{\n    \"text\": \"Updated question text\",\n    \"questionType\": \"SINGLE_CHOICE\",\n    \"options\": [\n        {\"text\": \"Option 1\", \"isCorrect\": false, \"displayOrder\": 1},\n        {\"text\": \"Option 2\", \"isCorrect\": true, \"displayOrder\": 2},\n        {\"text\": \"Option 3\", \"isCorrect\": false, \"displayOrder\": 3},\n        {\"text\": \"Option 4\", \"isCorrect\": false, \"displayOrder\": 4}\n    ],\n    \"timeLimit\": 25\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}",
@@ -513,14 +518,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"participantId\": \"{{participantId}}\",\n    \"questionId\": \"{{questionId}}\",\n    \"selectedOptions\": [\"1\", \"3\"]\n}"
+              "raw": "{\n    \"participantId\": \"{{participantId}}\",\n    \"questionId\": \"{{questionId}}\",\n    \"selectedOptions\": [\"1\", \"3\"],\n    \"timeTaken\": 5.2\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/answers",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "answers"]
             },
-            "description": "Submit an answer to a question. For multiple choice questions, multiple option IDs can be provided. (public route)"
+            "description": "Submit an answer to a question. For multiple choice questions, multiple option IDs can be provided. The timeTaken field represents how long the participant took to answer in seconds. (public route)"
           },
           "response": []
         },
@@ -574,24 +579,53 @@
       ]
     },
     {
+      "name": "Quiz State",
+      "item": [
+        {
+          "name": "Get Quiz State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/states/quiz/{{quizId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "states", "quiz", "{{quizId}}"]
+            },
+            "description": "Get the complete state of a quiz including current phase, active question, timer, and participants"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Participants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/states/quiz/{{quizId}}/participants/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "states", "quiz", "{{quizId}}", "participants", "active"]
+            },
+            "description": "Get all currently active participants for a quiz (participants who have an active connection)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Quiz state management endpoints for retrieving real-time state information"
+    },
+    {
       "name": "WebSocket Connection",
       "item": [
         {
           "name": "Connect as Quiz Creator",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{wsBaseUrl}}/ws/{{quizId}}/user/{{userId}}",
               "host": ["{{wsBaseUrl}}"],
               "path": ["ws", "{{quizId}}", "user", "{{userId}}"]
             },
-            "description": "Connect to WebSocket as quiz creator. Note that this needs to be tested in a WebSocket client, not directly in Postman. Requires JWT authentication header."
+            "description": "Connect to WebSocket as quiz creator. Note that this needs to be tested in a WebSocket client, not directly in Postman."
           },
           "response": []
         },
@@ -609,7 +643,8 @@
           },
           "response": []
         }
-      ]
+      ],
+      "description": "WebSocket connection endpoints for real-time communication"
     },
     {
       "name": "Authentication",

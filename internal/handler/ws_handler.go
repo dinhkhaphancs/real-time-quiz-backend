@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -19,6 +20,7 @@ type WebSocketHandler struct {
 	quizService        service.QuizService
 	userService        service.UserService
 	participantService service.ParticipantService
+	stateService       service.StateService
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
@@ -27,12 +29,14 @@ func NewWebSocketHandler(
 	quizService service.QuizService,
 	userService service.UserService,
 	participantService service.ParticipantService,
+	stateService service.StateService,
 ) *WebSocketHandler {
 	return &WebSocketHandler{
 		hub:                hub,
 		quizService:        quizService,
 		userService:        userService,
 		participantService: participantService,
+		stateService:       stateService,
 	}
 }
 
@@ -67,7 +71,6 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 
 	// Variable to track if this is a creator connection
 	isCreator := false
-	userName := ""
 
 	// Validate the connection based on type
 	if connectionType == "user" {
@@ -93,7 +96,6 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		}
 
 		isCreator = true
-		userName = user.Name
 
 	} else if connectionType == "participant" {
 		// Get participant to validate
@@ -110,7 +112,6 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 			return
 		}
 
-		userName = participant.Name
 	} else {
 		log.Printf("Invalid connection type: %s\n", connectionType)
 		response.WithError(c, http.StatusBadRequest, "Invalid connection type", "Connection type must be 'user' or 'participant'")
@@ -144,6 +145,38 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		Cancel:    cancel,
 	}
 
+	// Record the connection in our state system if this is a participant
+	if !isCreator {
+		instanceID := h.hub.GetInstanceID()
+		err = h.stateService.UpdateParticipantConnection(c, id, quizID, true, instanceID)
+		if err != nil {
+			log.Printf("Error recording participant connection: %v", err)
+			// Continue despite error - this is not critical
+		}
+
+		// Set up a deferred cleanup to mark this participant as disconnected when the connection ends
+		go func(participantID, quizID uuid.UUID, instanceID string) {
+			// Wait for context cancellation (which happens when the connection closes)
+			<-wsCtx.Done()
+
+			// Mark participant as disconnected
+			ctx := context.Background()
+			err := h.stateService.UpdateParticipantConnection(ctx, participantID, quizID, false, instanceID)
+			if err != nil {
+				log.Printf("Error updating participant disconnection: %v", err)
+			}
+		}(id, quizID, instanceID)
+	} else {
+		// For creator connections, we don't need to track connections in the same way,
+		// but we might want to register the instance
+		instanceID := h.hub.GetInstanceID()
+		err = h.stateService.RegisterInstance(c, instanceID)
+		if err != nil {
+			log.Printf("Error registering instance: %v", err)
+			// Continue despite error
+		}
+	}
+
 	// Subscribe to Redis events for this quiz if not already subscribed
 	if err := h.hub.SubscribeToQuiz(quizID); err != nil {
 		response.WithError(c, http.StatusInternalServerError, "Subscription error", "Failed to subscribe to quiz events")
@@ -153,22 +186,23 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	}
 
 	// Register client with the hub
-	// Use the register channel to let the hub handle the registration
 	h.hub.GetRegisterChan() <- client
 
 	// Start goroutines for reading and writing
 	go client.ReadPump()
 	go client.WritePump()
 
-	// Notify other clients about the new connection (only for participants)
-	if !isCreator {
-		h.hub.PublishToQuiz(quizID, ws.Event{
-			Type: ws.EventUserJoined,
-			Payload: map[string]interface{}{
-				"id":   id.String(),
-				"name": userName,
-				"type": connectionType,
-			},
-		})
+	// Get current quiz state and send it to the client for initial synchronization
+	if state, err := h.stateService.GetQuizState(c, quizID); err == nil {
+		// Send full state to the client
+		stateEvent := ws.Event{
+			Type:    ws.EventStateSync,
+			Payload: state,
+		}
+
+		// Marshal to JSON
+		if jsonData, err := json.Marshal(stateEvent); err == nil {
+			client.Send <- jsonData
+		}
 	}
 }

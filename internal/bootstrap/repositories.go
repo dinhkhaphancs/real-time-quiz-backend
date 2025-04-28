@@ -13,6 +13,7 @@ type Repositories struct {
 	UserRepo           repository.UserRepository
 	ParticipantRepo    repository.ParticipantRepository
 	AnswerRepo         repository.AnswerRepository
+	StateRepo          repository.StateRepository
 }
 
 // NewRepositories initializes all repositories
@@ -24,5 +25,6 @@ func NewRepositories(db *repository.DB) *Repositories {
 		UserRepo:           repository.NewPostgresUserRepository(db),
 		ParticipantRepo:    repository.NewPostgresParticipantRepository(db),
 		AnswerRepo:         repository.NewPostgresAnswerRepository(db),
+		StateRepo:          repository.NewStateRepository(db.DB),
 	}
 }

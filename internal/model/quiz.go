@@ -18,6 +18,18 @@ const (
 	QuizStatusCompleted QuizStatus = "COMPLETED"
 )
 
+// QuizPhase represents the current phase of an active quiz
+type QuizPhase string
+
+const (
+	// QuizPhaseBetweenQuestions indicates the quiz is active but between questions
+	QuizPhaseBetweenQuestions QuizPhase = "BETWEEN_QUESTIONS"
+	// QuizPhaseQuestionActive indicates there is an active question being answered
+	QuizPhaseQuestionActive QuizPhase = "QUESTION_ACTIVE"
+	// QuizPhaseShowingResults indicates the question has ended and results are being shown
+	QuizPhaseShowingResults QuizPhase = "SHOWING_RESULTS"
+)
+
 // Quiz represents a quiz that can be joined by users
 type Quiz struct {
 	ID          uuid.UUID  `json:"id" db:"id"`
@@ -35,9 +47,12 @@ type QuizSession struct {
 	QuizID                   uuid.UUID  `json:"quizId" db:"quiz_id"`
 	CurrentQuestionID        *uuid.UUID `json:"currentQuestionId" db:"current_question_id"`
 	Status                   QuizStatus `json:"status" db:"status"`
+	CurrentPhase             QuizPhase  `json:"currentPhase" db:"current_phase"`
 	StartedAt                *time.Time `json:"startedAt" db:"started_at"`
 	EndedAt                  *time.Time `json:"endedAt" db:"ended_at"`
 	CurrentQuestionStartedAt *time.Time `json:"currentQuestionStartedAt" db:"current_question_started_at"`
+	CurrentQuestionEndedAt   *time.Time `json:"currentQuestionEndedAt" db:"current_question_ended_at"`
+	NextQuestionID           *uuid.UUID `json:"nextQuestionId" db:"next_question_id"`
 }
 
 // NewQuiz creates a new quiz with the given title, description, and creator ID
@@ -70,7 +85,8 @@ func generateQuizCode() string {
 // NewQuizSession creates a new quiz session for the given quiz ID
 func NewQuizSession(quizID uuid.UUID) *QuizSession {
 	return &QuizSession{
-		QuizID: quizID,
-		Status: QuizStatusWaiting,
+		QuizID:       quizID,
+		Status:       QuizStatusWaiting,
+		CurrentPhase: QuizPhaseBetweenQuestions,
 	}
 }

@@ -16,15 +16,25 @@ type RedisHub struct {
 	redisClient *redis.Client
 	pubsub      *redis.PubSub
 	ctx         context.Context
+	instanceID  string // Unique identifier for this server instance
 }
 
 // NewRedisHub creates a new Redis-based WebSocket hub
 func NewRedisHub(redisClient *redis.Client, ctx context.Context) *RedisHub {
+	// Generate a unique instance ID for this server
+	instanceID := uuid.New().String()
+
 	return &RedisHub{
 		Hub:         NewHub(),
 		redisClient: redisClient,
 		ctx:         ctx,
+		instanceID:  instanceID,
 	}
+}
+
+// GetInstanceID returns the unique identifier for this server instance
+func (h *RedisHub) GetInstanceID() string {
+	return h.instanceID
 }
 
 // SubscribeToQuiz subscribes to Redis events for a quiz

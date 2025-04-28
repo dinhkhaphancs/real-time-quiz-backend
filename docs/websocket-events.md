@@ -32,6 +32,27 @@ All WebSocket events follow this JSON structure:
 }
 ```
 
+## WebSocket Event Types
+
+The following event types are used in the application for real-time communication:
+
+### Core Event Types
+These are the officially defined event types in the codebase:
+
+- `QUIZ_START` - Sent when a quiz begins
+- `QUESTION_START` - Sent when a new question becomes active
+- `QUESTION_END` - Sent when a question ends
+- `ANSWER_RECEIVED` - Confirmation that a participant's answer was received
+- `LEADERBOARD_UPDATE` - Sent when the leaderboard changes
+- `QUIZ_END` - Sent when a quiz ends
+- `USER_JOINED` - Sent when a new participant joins
+- `USER_LEFT` - Sent when a participant leaves
+- `TIMER_UPDATE` - Sent periodically to update the timer countdown
+- `ERROR` - Sent when an error occurs
+
+### System Events
+- `ping`/`pong` - Used for connection health checks
+
 ## Server-to-Client Events
 
 These events are sent from the server to connected clients.
@@ -288,6 +309,70 @@ Sent periodically to update clients about remaining time for the current questio
   "type": "TIMER_UPDATE",
   "payload": {
     "remainingSeconds": 15
+  }
+}
+```
+
+### STATE_SYNC
+
+Sent to clients when they connect or reconnect to provide the complete current state of the quiz.
+
+#### Payload
+
+| Field | Type | Description |
+|-------|------|-------------|
+| quizId | string (UUID) | Quiz identifier |
+| currentPhase | string | Current quiz phase (BETWEEN_QUESTIONS, QUESTION_ACTIVE, SHOWING_RESULTS) |
+| activeQuestion | object (optional) | Details of the currently active question (if any) |
+| activeParticipants | array | List of currently connected participants |
+| leaderboard | array | Current leaderboard data |
+| timerInfo | object (optional) | Information about any active timers |
+
+#### Example
+
+```json
+{
+  "type": "STATE_SYNC",
+  "payload": {
+    "quizId": "550e8400-e29b-41d4-a716-446655440000",
+    "currentPhase": "QUESTION_ACTIVE",
+    "activeQuestion": {
+      "questionId": "550e8400-e29b-41d4-a716-446655440000",
+      "questionText": "What is the capital of France?",
+      "options": [
+        { "id": "opt1", "text": "London" },
+        { "id": "opt2", "text": "Paris" },
+        { "id": "opt3", "text": "Berlin" },
+        { "id": "opt4", "text": "Rome" }
+      ],
+      "timeLimit": 30,
+      "allowMultipleAnswers": false,
+      "startedAt": "2025-04-28T14:40:00Z"
+    },
+    "activeParticipants": [
+      {
+        "participantId": "550e8400-e29b-41d4-a716-446655440001",
+        "nickname": "QuizWhiz",
+        "isConnected": true
+      },
+      {
+        "participantId": "550e8400-e29b-41d4-a716-446655440002",
+        "nickname": "BrainBox",
+        "isConnected": true
+      }
+    ],
+    "leaderboard": [
+      {
+        "participantId": "550e8400-e29b-41d4-a716-446655440001",
+        "nickname": "QuizWhiz",
+        "score": 1200,
+        "position": 1
+      }
+    ],
+    "timerInfo": {
+      "remainingSeconds": 15,
+      "totalSeconds": 30
+    }
   }
 }
 ```

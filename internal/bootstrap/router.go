@@ -137,6 +137,21 @@ func setupRoutes(router *gin.Engine, handlers *Handlers, jwtManager *auth.JWTMan
 		}
 	}
 
+	// ========== Quiz State Module ==========
+	stateRoutes := apiV1.Group("/states")
+	{
+		// Public state routes
+		stateRoutes.GET("/quiz/:quizId", handlers.StateHandler.GetQuizState)
+		stateRoutes.GET("/quiz/:quizId/participants/active", handlers.StateHandler.GetActiveParticipants)
+
+		// Private state routes if needed
+		statePrivate := stateRoutes.Group("")
+		statePrivate.Use(authMiddleware)
+		{
+			// Add protected state endpoints here in the future
+		}
+	}
+
 	// ========== WebSocket ==========
 	// WebSocket route (outside API versioning)
 	router.GET("/ws/:quizId/:type/:id", handlers.WSHandler.HandleConnection)

@@ -58,6 +58,8 @@ const (
 
 	// EventError is sent when an error occurs
 	EventError EventType = "ERROR"
+
+	EventStateSync = "STATE_SYNC"
 )
 
 var (

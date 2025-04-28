@@ -14,11 +14,13 @@ type Services struct {
 	QuestionService    service.QuestionService
 	AnswerService      service.AnswerService
 	LeaderboardService service.LeaderboardService
+	StateService       service.StateService
 }
 
 // NewServices initializes all services
 func NewServices(repos *Repositories, jwtManager *auth.JWTManager, wsHub *websocket.RedisHub) *Services {
 	leaderBoardSerice := service.NewLeaderboardService(repos.ParticipantRepo, wsHub)
+
 	return &Services{
 		UserService:        service.NewUserService(repos.UserRepo, jwtManager),
 		ParticipantService: service.NewParticipantService(repos.ParticipantRepo, repos.QuizRepo, wsHub),
@@ -26,5 +28,6 @@ func NewServices(repos *Repositories, jwtManager *auth.JWTManager, wsHub *websoc
 		QuestionService:    service.NewQuestionService(repos.QuizRepo, repos.QuestionRepo, repos.QuestionOptionRepo, wsHub),
 		AnswerService:      service.NewAnswerService(repos.AnswerRepo, repos.QuestionRepo, repos.ParticipantRepo, repos.QuizRepo, leaderBoardSerice, repos.QuestionOptionRepo, wsHub),
 		LeaderboardService: leaderBoardSerice,
+		StateService:       service.NewStateService(repos.StateRepo, repos.QuizRepo, repos.QuestionRepo, repos.QuestionOptionRepo, repos.ParticipantRepo, wsHub),
 	}
 }

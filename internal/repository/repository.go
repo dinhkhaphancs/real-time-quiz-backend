@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/google/uuid"
@@ -125,4 +126,23 @@ type AnswerRepository interface {
 
 	// GetAnswerByParticipantAndQuestion retrieves a participant's answer for a specific question
 	GetAnswerByParticipantAndQuestion(ctx context.Context, participantID uuid.UUID, questionID uuid.UUID) (*model.Answer, error)
+}
+
+// StateRepository defines methods for managing quiz state
+type StateRepository interface {
+	// Quiz Events
+	StoreEvent(ctx context.Context, event *model.QuizEvent) error
+	GetMissedEvents(ctx context.Context, quizID uuid.UUID, lastSequence int64, limit int) ([]*model.QuizEvent, error)
+
+	// Participant Connections
+	UpdateParticipantConnection(ctx context.Context, conn *model.ParticipantConnection) error
+	GetActiveParticipantConnections(ctx context.Context, quizID uuid.UUID, cutoffTime time.Time) ([]*model.ParticipantConnection, error)
+
+	// Instance Management
+	RegisterInstance(ctx context.Context, instance *model.ServerInstance) error
+	UpdateInstanceHeartbeat(ctx context.Context, instanceID string) error
+	GetActiveInstances(ctx context.Context, cutoffTime time.Time) ([]*model.ServerInstance, error)
+
+	// Sequence Number Management
+	IncrementSequenceNumber(ctx context.Context, quizID uuid.UUID) (int64, error)
 }
