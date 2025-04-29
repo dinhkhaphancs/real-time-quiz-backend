@@ -89,6 +89,7 @@ func setupRoutes(router *gin.Engine, handlers *Handlers, jwtManager *auth.JWTMan
 			questionPrivate.POST("", handlers.QuestionHandler.AddQuestion)
 			questionPrivate.POST("/:id/start", handlers.QuestionHandler.StartQuestion)
 			questionPrivate.POST("/:id/end", handlers.QuestionHandler.EndQuestion)
+			questionPrivate.POST("/:id/move-next-question", handlers.QuestionHandler.MoveToNextQuestion)
 		}
 	}
 

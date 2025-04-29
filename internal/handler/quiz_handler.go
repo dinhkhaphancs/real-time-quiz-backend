@@ -268,10 +268,7 @@ func (h *QuizHandler) JoinQuiz(c *gin.Context) {
 
 // JoinQuizByCode allows a user to join a quiz using a code
 func (h *QuizHandler) JoinQuizByCode(c *gin.Context) {
-	var request struct {
-		Code string `json:"code" binding:"required"`
-		Name string `json:"name" binding:"required"`
-	}
+	var request dto.QuizJoinByCodeRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.WithError(c, http.StatusBadRequest, "Invalid request data", err.Error())

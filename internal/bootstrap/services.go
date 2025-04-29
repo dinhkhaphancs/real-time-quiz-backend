@@ -20,14 +20,15 @@ type Services struct {
 // NewServices initializes all services
 func NewServices(repos *Repositories, jwtManager *auth.JWTManager, wsHub *websocket.RedisHub) *Services {
 	leaderBoardSerice := service.NewLeaderboardService(repos.ParticipantRepo, wsHub)
+	stateService := service.NewStateService(repos.StateRepo, repos.QuizRepo, repos.QuestionRepo, repos.QuestionOptionRepo, repos.ParticipantRepo, wsHub)
 
 	return &Services{
 		UserService:        service.NewUserService(repos.UserRepo, jwtManager),
 		ParticipantService: service.NewParticipantService(repos.ParticipantRepo, repos.QuizRepo, wsHub),
-		QuizService:        service.NewQuizService(repos.QuizRepo, repos.UserRepo, repos.QuestionRepo, repos.QuestionOptionRepo, wsHub),
-		QuestionService:    service.NewQuestionService(repos.QuizRepo, repos.QuestionRepo, repos.QuestionOptionRepo, wsHub),
+		QuizService:        service.NewQuizService(repos.QuizRepo, repos.UserRepo, repos.QuestionRepo, repos.QuestionOptionRepo, stateService, wsHub),
+		QuestionService:    service.NewQuestionService(repos.QuizRepo, repos.QuestionRepo, repos.QuestionOptionRepo, wsHub, stateService),
 		AnswerService:      service.NewAnswerService(repos.AnswerRepo, repos.QuestionRepo, repos.ParticipantRepo, repos.QuizRepo, leaderBoardSerice, repos.QuestionOptionRepo, wsHub),
 		LeaderboardService: leaderBoardSerice,
-		StateService:       service.NewStateService(repos.StateRepo, repos.QuizRepo, repos.QuestionRepo, repos.QuestionOptionRepo, repos.ParticipantRepo, wsHub),
+		StateService:       stateService,
 	}
 }

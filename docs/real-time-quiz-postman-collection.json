@@ -500,6 +500,25 @@
             "description": "End a specific question in the quiz. Requires JWT authentication."
           },
           "response": []
+        },
+        {
+          "name": "Move To Next Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions/quiz/{{quizId}}/moveToNext",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions", "quiz", "{{quizId}}", "moveToNext"]
+            },
+            "description": "Move to the next question in the quiz sequence. This transitions from SHOWING_RESULTS phase to BETWEEN_QUESTIONS phase, preparing for the next question. Requires JWT authentication."
+          },
+          "response": []
         }
       ]
     },
@@ -608,7 +627,7 @@
             "description": "Get all currently active participants for a quiz (participants who have an active connection)"
           },
           "response": []
-        }
+                }
       ],
       "description": "Quiz state management endpoints for retrieving real-time state information"
     },
@@ -642,7 +661,7 @@
             "description": "Connect to WebSocket as participant. Note that this needs to be tested in a WebSocket client, not directly in Postman."
           },
           "response": []
-        }
+                }
       ],
       "description": "WebSocket connection endpoints for real-time communication"
     },

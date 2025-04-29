@@ -217,22 +217,20 @@ func (h *Hub) StartTimerBroadcast(quizID uuid.UUID, durationSeconds int) {
 		now := time.Now()
 		if now.After(endTime) {
 			// Time's up
-			h.BroadcastToQuiz(quizID, Event{
-				Type: EventTimerUpdate,
-				Payload: map[string]interface{}{
-					"remainingSeconds": 0,
-				},
-			})
+			h.BroadcastToQuiz(quizID, NewEvent(EventTimerUpdate, map[string]interface{}{
+				"remainingSeconds": 0,
+				"totalSeconds":     durationSeconds,
+				"endTime":          endTime.Format(time.RFC3339),
+			}))
 			return
 		}
 
 		remainingSeconds := int(endTime.Sub(now).Seconds())
-		h.BroadcastToQuiz(quizID, Event{
-			Type: EventTimerUpdate,
-			Payload: map[string]interface{}{
-				"remainingSeconds": remainingSeconds,
-			},
-		})
+		h.BroadcastToQuiz(quizID, NewEvent(EventTimerUpdate, map[string]interface{}{
+			"remainingSeconds": remainingSeconds,
+			"totalSeconds":     durationSeconds,
+			"endTime":          endTime.Format(time.RFC3339),
+		}))
 	}
 }
 

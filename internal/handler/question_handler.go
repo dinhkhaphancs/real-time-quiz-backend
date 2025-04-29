@@ -5,6 +5,7 @@ import (
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/middleware"
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/service"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -242,5 +243,59 @@ func (h *QuestionHandler) GetNextQuestion(c *gin.Context) {
 	questionResponse := dto.QuestionResponseFromModel(question, false)
 	response.WithSuccess(c, http.StatusOK, "Next question fetched successfully", map[string]interface{}{
 		"question": questionResponse,
+	})
+}
+
+// MoveToNextQuestion transitions the quiz to the between-questions phase
+func (h *QuestionHandler) MoveToNextQuestion(c *gin.Context) {
+	quizIDStr := c.Param("quizId")
+	quizID, err := uuid.Parse(quizIDStr)
+	if err != nil {
+		response.WithError(c, http.StatusBadRequest, "Invalid quiz ID", "The provided quiz ID is not valid")
+		return
+	}
+
+	// Get authenticated user ID from JWT context
+	userID := middleware.GetAuthUserID(c)
+	if userID == uuid.Nil {
+		response.WithError(c, http.StatusUnauthorized, "Unauthorized", "Authentication required")
+		return
+	}
+
+	// Verify quiz ownership
+	quiz, err := h.quizService.GetQuiz(c, quizID)
+	if err != nil {
+		response.WithError(c, http.StatusNotFound, "Quiz not found", err.Error())
+		return
+	}
+
+	// Check if the authenticated user is the quiz creator
+	if quiz.CreatorID != userID {
+		response.WithError(c, http.StatusForbidden, "Access denied", "Only the quiz creator can move to the next question")
+		return
+	}
+
+	// Move to next question phase
+	if err := h.questionService.MoveToNextQuestion(c, quizID); err != nil {
+		response.WithError(c, http.StatusBadRequest, "Failed to move to next question", err.Error())
+		return
+	}
+
+	// Determine if there is a next question
+	nextQuestion, err := h.questionService.GetNextQuestion(c, quizID)
+	hasNext := err == nil && nextQuestion != nil
+
+	var nextText string
+	if hasNext {
+		nextText = nextQuestion.Text
+	} else {
+		nextText = "End of quiz"
+	}
+
+	response.WithSuccess(c, http.StatusOK, "Moved to between-questions phase", map[string]interface{}{
+		"quizId":   quizID.String(),
+		"phase":    string(model.QuizPhaseBetweenQuestions),
+		"hasNext":  hasNext,
+		"nextText": nextText,
 	})
 }

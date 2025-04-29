@@ -557,6 +557,8 @@ command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" 
 - ✅ Added quiz description support for more detailed quiz information
 - ✅ Enhanced quiz creation to support creating quizzes with questions in a single API call
 - ✅ Implemented support for dynamic options and multiple choice questions
+- ✅ Added comprehensive state management system with clear quiz phases and state transitions
+- ✅ Standardized WebSocket message format for improved client-side processing
 
 ### Current Implementation Status
 
@@ -570,130 +572,14 @@ command: sh -c "migrate -path /app/migrations/versioned -database \"${DB_URL}\" 
 - ✅ Quiz joining by code for improved usability
 - ✅ Dedicated participant management API endpoints
 - ✅ Real-time leaderboard updates
-- ✅ Basic quiz flow (waiting, active, completed states)
+- ✅ Advanced quiz flow with distinct phases (waiting, between-questions, question-active, showing-results, completed)
 - ✅ Role-based WebSocket communication (different events for creators vs participants)
 - ✅ Real-time notifications when participants join or leave
 - ✅ Bootstrap pattern implementation for improved code organization
 - ✅ Modular API structure organized by domain with clear public/private route separation
 - ✅ Dynamic options support with ability to add custom options to questions
 - ✅ Multiple choice questions that allow selecting multiple correct answers
-
-### Standardized Response Pattern
-
-The application now implements a consistent response pattern for all API endpoints:
-
-1. **Standardized Response Structure**:
-   ```json
-   {
-     "success": true,
-     "message": "Resource created successfully",
-     "data": { ... },
-     "timestamp": "2025-04-26T12:34:56Z"
-   }
-   ```
-   
-2. **Consistent Error Handling**:
-   ```json
-   {
-     "success": false,
-     "message": "Validation error",
-     "error": "Detailed error description",
-     "timestamp": "2025-04-26T12:34:56Z"
-   }
-   ```
-
-3. **Support for Pagination**:
-   ```json
-   {
-     "success": true,
-     "message": "Resources fetched successfully",
-     "data": [ ... ],
-     "pagination": {
-       "total": 100,
-       "perPage": 10,
-       "currentPage": 1,
-       "lastPage": 10
-     },
-     "timestamp": "2025-04-26T12:34:56Z"
-   }
-   ```
-
-The response pattern offers:
-- Clear success/failure indication with the `success` boolean
-- User-friendly messages with the `message` field
-- Detailed error information in the `error` field
-- Consistent structure across all endpoints (REST and WebSocket)
-- Automatic timestamp inclusion for logging and debugging
-
-### Code Organization
-
-The project follows a clean architecture with clear separation of concerns:
-
-1. **Bootstrap Layer** (`/internal/bootstrap/`):
-   - Application initialization and dependency management
-   - Component wiring with clear flow from repositories → services → handlers
-   - Modular application startup with separate concerns:
-     - `app.go`: The central application coordinator
-     - `repositories.go`: Repository instances creation
-     - `services.go`: Service layer initialization
-     - `handlers.go`: API handlers construction
-     - `router.go`: Route configuration with domain-based organization
-     - `server.go`: HTTP server setup and lifecycle management
-
-2. **DTO Layer** (`/internal/dto/`):
-   - Data Transfer Objects for API request/response
-   - Simplified naming convention (removed redundant "Dto" suffix)
-   - Conversion functions from domain models to DTOs
-
-3. **Handler Layer** (`/internal/handler/`):
-   - API endpoints using Gin framework
-   - Standardized response handling
-   - Request validation
-   - WebSocket connection management
-   - Business logic delegation to service layer
-
-4. **Service Layer** (`/internal/service/`):
-   - Business logic implementation
-   - Transaction management
-   - Domain validations
-   - Cross-cutting concerns coordination
-
-5. **Repository Layer** (`/internal/repository/`):
-   - Data access abstraction
-   - Database interactions
-   - Query construction
-   - Persistence operations
-
-6. **Model Layer** (`/internal/model/`):
-   - Domain models representing core business entities
-   - Business rules and validations
-   - Application's central data structures
-
-7. **Middleware Layer** (`/internal/middleware/`):
-   - Request pre-processing and post-processing
-   - Authentication and authorization
-   - Request logging and monitoring
-   - Cross-cutting concerns
-
-8. **Configuration Layer** (`/internal/config/`):
-   - Application configuration loading
-   - Environment-specific settings
-   - Secrets management
-
-9. **Utility Packages** (`/pkg/`):
-   - `auth`: Authentication utilities (JWT implementation)
-   - `response`: Standardized API response handling
-   - `websocket`: WebSocket implementation for real-time communication
-   - `logger`: Application logging
-   - `validator`: Input validation utilities
-
-This layered architecture provides:
-- Clear separation of concerns
-- Improved maintainability through focused components
-- Better testability with well-defined boundaries
-- Consistent API design and response formatting
-- Simplified onboarding for new developers
-- Scalable code organization as the application grows
+- ✅ Standardized WebSocket message payloads with timestamps and metadata
 
 ### TODO to Fulfill Requirements
 
@@ -716,8 +602,8 @@ This layered architecture provides:
 
 4. **UI Differentiation**:
    - ✅ Backend support for different views between creators and participants
-   - [ ] Hide question content from participants during answer period
-   - [ ] Show correct answers to quiz creators in real-time
+   - ✅ Hide question content from participants during answer period
+   - ✅ Show correct answers to quiz creators in real-time
 
 5. **Additional Features**:
    - [ ] Quiz templates and reusability

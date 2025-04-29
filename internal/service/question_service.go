@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/model"
@@ -27,6 +26,7 @@ type questionServiceImpl struct {
 	questionRepo       repository.QuestionRepository
 	questionOptionRepo repository.QuestionOptionRepository
 	wsHub              *websocket.RedisHub
+	stateService       StateService
 }
 
 // NewQuestionService creates a new question service
@@ -35,12 +35,14 @@ func NewQuestionService(
 	questionRepo repository.QuestionRepository,
 	questionOptionRepo repository.QuestionOptionRepository,
 	wsHub *websocket.RedisHub,
+	stateService StateService,
 ) QuestionService {
 	return &questionServiceImpl{
 		quizRepo:           quizRepo,
 		questionRepo:       questionRepo,
 		questionOptionRepo: questionOptionRepo,
 		wsHub:              wsHub,
+		stateService:       stateService,
 	}
 }
 
@@ -173,173 +175,6 @@ func (s *questionServiceImpl) GetQuestion(ctx context.Context, id uuid.UUID) (*m
 	return question, nil
 }
 
-// StartQuestion starts a specific question in a quiz
-func (s *questionServiceImpl) StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error {
-	// Check if quiz exists and is active
-	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
-	if err != nil {
-		return ErrQuizNotFound
-	}
-	if quiz.Status != model.QuizStatusActive {
-		return ErrQuizNotActive
-	}
-
-	// Check if question exists and belongs to this quiz
-	question, err := s.GetQuestion(ctx, questionID) // Use GetQuestion to load options
-	if err != nil {
-		return ErrQuestionNotFound
-	}
-	if question.QuizID != quizID {
-		return errors.New("question does not belong to this quiz")
-	}
-
-	// Update quiz session with current question
-	session, err := s.quizRepo.GetQuizSession(ctx, quizID)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	session.CurrentQuestionID = &questionID
-	session.CurrentQuestionStartedAt = &now
-
-	if err := s.quizRepo.UpdateQuizSession(ctx, session); err != nil {
-		return err
-	}
-
-	// Get total question count for better UI experience
-	questions, err := s.questionRepo.GetQuestionsByQuizID(ctx, quizID)
-	if err != nil {
-		// Non-critical error, we can continue with approximate count
-		questions = []*model.Question{question}
-	}
-	totalCount := len(questions)
-
-	// Convert options to a format suitable for broadcasting
-	options := make([]map[string]interface{}, len(question.Options))
-	for i, opt := range question.Options {
-		options[i] = map[string]interface{}{
-			"id":   opt.ID.String(),
-			"text": opt.Text,
-		}
-	}
-
-	// Different payloads for creators and participants
-	// For creators (quiz admins), send full question details including correct answers
-	creatorOptions := make([]map[string]interface{}, len(question.Options))
-	for i, opt := range question.Options {
-		creatorOptions[i] = map[string]interface{}{
-			"id":        opt.ID.String(),
-			"text":      opt.Text,
-			"isCorrect": opt.IsCorrect,
-		}
-	}
-
-	s.wsHub.PublishToCreators(quizID, websocket.Event{
-		Type: websocket.EventQuestionStart,
-		Payload: map[string]interface{}{
-			"quizId":       quiz.ID.String(),
-			"quizTitle":    quiz.Title,
-			"questionId":   question.ID.String(),
-			"text":         question.Text,
-			"options":      creatorOptions,
-			"questionType": string(question.QuestionType),
-			"timeLimit":    question.TimeLimit,
-			"order":        question.Order,
-			"totalCount":   totalCount,
-		},
-	})
-
-	// For participants, send options without correct answer information
-	s.wsHub.PublishToParticipants(quizID, websocket.Event{
-		Type: websocket.EventQuestionStart,
-		Payload: map[string]interface{}{
-			"quizId":       quiz.ID.String(),
-			"quizTitle":    quiz.Title,
-			"questionId":   question.ID.String(),
-			"text":         question.Text,
-			"options":      options,
-			"questionType": string(question.QuestionType),
-			"timeLimit":    question.TimeLimit,
-			"order":        question.Order,
-			"totalCount":   totalCount,
-		},
-	})
-
-	// Start a timer to broadcast countdown and end the question
-	go s.wsHub.StartTimerBroadcast(quizID, question.TimeLimit)
-
-	// Start a goroutine to automatically end the question after the time limit
-	go func() {
-		timer := time.NewTimer(time.Duration(question.TimeLimit) * time.Second)
-		<-timer.C
-
-		// End the question automatically
-		if err := s.EndQuestion(context.Background(), quizID); err != nil {
-			// Log the error but don't stop execution
-			// In a real application, we would use a proper logger
-			// logger.Error("Error ending question", "error", err)
-		}
-	}()
-
-	return nil
-}
-
-// EndQuestion ends the current question in a quiz
-func (s *questionServiceImpl) EndQuestion(ctx context.Context, quizID uuid.UUID) error {
-	// Check if quiz exists and is active
-	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
-	if err != nil {
-		return ErrQuizNotFound
-	}
-	if quiz.Status != model.QuizStatusActive {
-		return ErrQuizNotActive
-	}
-
-	// Get current session
-	session, err := s.quizRepo.GetQuizSession(ctx, quizID)
-	if err != nil {
-		return err
-	}
-
-	if session.CurrentQuestionID == nil {
-		return errors.New("no active question to end")
-	}
-
-	// Get question details with options
-	question, err := s.GetQuestion(ctx, *session.CurrentQuestionID)
-	if err != nil {
-		return ErrQuestionNotFound
-	}
-
-	// Get correct options to send in the event
-	correctOptions := question.GetCorrectOptions()
-	correctOptionIds := make([]string, len(correctOptions))
-	for i, opt := range correctOptions {
-		correctOptionIds[i] = opt.ID.String()
-	}
-
-	// Broadcast question end event with correct answers
-	s.wsHub.BroadcastToQuiz(quizID, websocket.Event{
-		Type: websocket.EventQuestionEnd,
-		Payload: map[string]interface{}{
-			"questionId":       question.ID.String(),
-			"correctOptionIds": correctOptionIds,
-			"questionType":     string(question.QuestionType),
-		},
-	})
-
-	// Clear current question in session
-	session.CurrentQuestionID = nil
-	session.CurrentQuestionStartedAt = nil
-
-	if err := s.quizRepo.UpdateQuizSession(ctx, session); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // GetNextQuestion retrieves the next question in sequence
 func (s *questionServiceImpl) GetNextQuestion(ctx context.Context, quizID uuid.UUID) (*model.Question, error) {
 	// Check if quiz exists and is active
@@ -399,4 +234,22 @@ func (s *questionServiceImpl) GetNextQuestion(ctx context.Context, quizID uuid.U
 
 	// Load options for the next question
 	return s.GetQuestion(ctx, nextQuestion.ID)
+}
+
+// StartQuestion starts a question by delegating to the state service
+func (s *questionServiceImpl) StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error {
+	// Delegate to state service
+	return s.stateService.StartQuestion(ctx, quizID, questionID)
+}
+
+// EndQuestion ends the current question by delegating to the state service
+func (s *questionServiceImpl) EndQuestion(ctx context.Context, quizID uuid.UUID) error {
+	// Delegate to state service
+	return s.stateService.EndQuestion(ctx, quizID)
+}
+
+// MoveToNextQuestion moves to the next question by delegating to the state service
+func (s *questionServiceImpl) MoveToNextQuestion(ctx context.Context, quizID uuid.UUID) error {
+	// Delegate to state service
+	return s.stateService.MoveToNextQuestion(ctx, quizID)
 }

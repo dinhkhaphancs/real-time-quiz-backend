@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/dinhkhaphancs/real-time-quiz-backend/internal/dto"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -95,6 +96,31 @@ type AnswerPayload struct {
 type Event struct {
 	Type    EventType   `json:"type"`
 	Payload interface{} `json:"payload"`
+	// Internal fields not directly serialized
+	createAt time.Time
+}
+
+// NewEvent creates a new event with the current timestamp
+func NewEvent(eventType EventType, payload interface{}) Event {
+	return Event{
+		Type:     eventType,
+		Payload:  payload,
+		createAt: time.Now().UTC(),
+	}
+}
+
+// ToStandardMessage converts the event to a standardized message DTO
+func (e Event) ToStandardMessage() dto.StandardMessageDTO {
+	msg := dto.NewStandardMessage(string(e.Type), e.Payload)
+	if !e.createAt.IsZero() {
+		msg.Timestamp = e.createAt
+	}
+	return msg
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (e Event) MarshalJSON() ([]byte, error) {
+	return e.ToStandardMessage().ToJSON()
 }
 
 // Client represents a WebSocket client connection
@@ -173,10 +199,7 @@ func (c *Client) ReadPump() {
 		switch incomingMsg.Type {
 		case "ping":
 			// Send pong response back
-			event := Event{
-				Type:    "pong",
-				Payload: map[string]interface{}{"time": time.Now().Unix()},
-			}
+			event := NewEvent("pong", map[string]interface{}{"time": time.Now().Unix()})
 			eventData, _ := json.Marshal(event)
 			c.Send <- eventData
 		case "ANSWER":
@@ -207,28 +230,22 @@ func (c *Client) ReadPump() {
 			}
 
 			// Publish answer event to Redis
-			event := Event{
-				Type: "CLIENT_ANSWER",
-				Payload: map[string]interface{}{
-					"participantId":   c.UserID.String(),
-					"questionId":      questionID.String(),
-					"selectedOptions": answerPayload.SelectedOptions,
-					"timeTaken":       answerPayload.TimeTaken,
-				},
-			}
+			event := NewEvent("CLIENT_ANSWER", map[string]interface{}{
+				"participantId":   c.UserID.String(),
+				"questionId":      questionID.String(),
+				"selectedOptions": answerPayload.SelectedOptions,
+				"timeTaken":       answerPayload.TimeTaken,
+			})
 
 			// Handle the event based on hub type
 			c.Hub.BroadcastToQuiz(c.QuizID, event)
 
 			// Also send direct confirmation to the client
-			confirmEvent := Event{
-				Type: EventAnswerReceived,
-				Payload: map[string]interface{}{
-					"questionId":      questionID.String(),
-					"selectedOptions": answerPayload.SelectedOptions,
-					"timeTaken":       answerPayload.TimeTaken,
-				},
-			}
+			confirmEvent := NewEvent(EventAnswerReceived, map[string]interface{}{
+				"questionId":      questionID.String(),
+				"selectedOptions": answerPayload.SelectedOptions,
+				"timeTaken":       answerPayload.TimeTaken,
+			})
 			c.Hub.SendToClient(c.UserID, c.QuizID, confirmEvent)
 		}
 	}

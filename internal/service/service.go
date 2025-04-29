@@ -55,14 +55,13 @@ type QuestionService interface {
 	// GetQuestion retrieves a question by ID
 	GetQuestion(ctx context.Context, id uuid.UUID) (*model.Question, error)
 
-	// StartQuestion starts a specific question in a quiz
-	StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error
-
-	// EndQuestion ends the current question in a quiz
-	EndQuestion(ctx context.Context, quizID uuid.UUID) error
-
 	// GetNextQuestion retrieves the next question in sequence
 	GetNextQuestion(ctx context.Context, quizID uuid.UUID) (*model.Question, error)
+
+	// State Management Methods
+	StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error
+	EndQuestion(ctx context.Context, quizID uuid.UUID) error
+	MoveToNextQuestion(ctx context.Context, quizID uuid.UUID) error
 }
 
 // AnswerService defines operations for answer business logic
@@ -117,4 +116,31 @@ type ParticipantService interface {
 
 	// RemoveParticipant removes a participant from a quiz
 	RemoveParticipant(ctx context.Context, id uuid.UUID) error
+}
+
+// StateService defines methods for managing quiz state
+type StateService interface {
+	// State Management
+	GetQuizState(ctx context.Context, quizID uuid.UUID) (*dto.QuizStateDTO, error)
+
+	// Events
+	PublishEvent(ctx context.Context, quizID uuid.UUID, eventType string, payload interface{}) error
+	GetMissedEvents(ctx context.Context, quizID uuid.UUID, lastSequence int64) ([]*model.QuizEvent, error)
+
+	// Participant Connection
+	UpdateParticipantConnection(ctx context.Context, participantID, quizID uuid.UUID, isConnected bool, instanceID string) error
+	GetActiveParticipants(ctx context.Context, quizID uuid.UUID) ([]model.Participant, error)
+
+	// Instance Management
+	RegisterInstance(ctx context.Context, instanceID string) error
+	UpdateInstanceHeartbeat(ctx context.Context, instanceID string) error
+
+	// State Transition Functions
+	StartQuestion(ctx context.Context, quizID uuid.UUID, questionID uuid.UUID) error
+	EndQuestion(ctx context.Context, quizID uuid.UUID) error
+	MoveToNextQuestion(ctx context.Context, quizID uuid.UUID) error
+
+	// Quiz Lifecycle Functions
+	StartQuiz(ctx context.Context, quizID uuid.UUID) error
+	EndQuiz(ctx context.Context, quizID uuid.UUID) error
 }

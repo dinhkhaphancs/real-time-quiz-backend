@@ -24,6 +24,12 @@ type QuizUpdateRequest struct {
 	Questions   []QuestionUpdateData `json:"questions"`
 }
 
+// QuizJoinByCodeRequest represents the request to join a quiz using a code
+type QuizJoinByCodeRequest struct {
+	Code string `json:"code" binding:"required"`
+	Name string `json:"name" binding:"required"`
+}
+
 // OptionData represents an option for updating a question
 type OptionData struct {
 	ID           *string `json:"id"`

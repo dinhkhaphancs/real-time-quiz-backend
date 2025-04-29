@@ -25,6 +25,7 @@ type quizServiceImpl struct {
 	userRepo           repository.UserRepository
 	questionRepo       repository.QuestionRepository
 	questionOptionRepo repository.QuestionOptionRepository
+	stateService       StateService
 	wsHub              *websocket.RedisHub
 }
 
@@ -34,6 +35,7 @@ func NewQuizService(
 	userRepo repository.UserRepository,
 	questionRepo repository.QuestionRepository,
 	questionOptionRepo repository.QuestionOptionRepository,
+	stateService StateService,
 	wsHub *websocket.RedisHub,
 ) QuizService {
 	return &quizServiceImpl{
@@ -41,6 +43,7 @@ func NewQuizService(
 		userRepo:           userRepo,
 		questionRepo:       questionRepo,
 		questionOptionRepo: questionOptionRepo,
+		stateService:       stateService,
 		wsHub:              wsHub,
 	}
 }
@@ -160,87 +163,14 @@ func (s *quizServiceImpl) GetQuizByCode(ctx context.Context, code string) (*mode
 
 // StartQuiz starts a quiz session
 func (s *quizServiceImpl) StartQuiz(ctx context.Context, quizID uuid.UUID) error {
-	// Get the quiz and session
-	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
-	if err != nil {
-		return ErrQuizNotFound
-	}
-
-	if quiz.Status != model.QuizStatusWaiting {
-		return ErrQuizAlreadyStarted
-	}
-
-	// Update quiz status
-	if err := s.quizRepo.UpdateQuizStatus(ctx, quizID, model.QuizStatusActive); err != nil {
-		return err
-	}
-
-	// Update session
-	session, err := s.quizRepo.GetQuizSession(ctx, quizID)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	session.Status = model.QuizStatusActive
-	session.StartedAt = &now
-
-	if err := s.quizRepo.UpdateQuizSession(ctx, session); err != nil {
-		return err
-	}
-
-	// Broadcast quiz start event to all clients
-	s.wsHub.BroadcastToQuiz(quizID, websocket.Event{
-		Type: websocket.EventQuizStart,
-		Payload: map[string]interface{}{
-			"quizId": quizID.String(),
-			"title":  quiz.Title,
-		},
-	})
-
-	return nil
+	// Delegate to state service
+	return s.stateService.StartQuiz(ctx, quizID)
 }
 
 // EndQuiz ends a quiz session
 func (s *quizServiceImpl) EndQuiz(ctx context.Context, quizID uuid.UUID) error {
-	// Get the quiz and session
-	quiz, err := s.quizRepo.GetQuizByID(ctx, quizID)
-	if err != nil {
-		return ErrQuizNotFound
-	}
-
-	if quiz.Status != model.QuizStatusActive {
-		return ErrQuizNotActive
-	}
-
-	// Update quiz status
-	if err := s.quizRepo.UpdateQuizStatus(ctx, quizID, model.QuizStatusCompleted); err != nil {
-		return err
-	}
-
-	// Update session
-	session, err := s.quizRepo.GetQuizSession(ctx, quizID)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	session.Status = model.QuizStatusCompleted
-	session.EndedAt = &now
-
-	if err := s.quizRepo.UpdateQuizSession(ctx, session); err != nil {
-		return err
-	}
-
-	// Broadcast quiz end event to all clients
-	s.wsHub.BroadcastToQuiz(quizID, websocket.Event{
-		Type: websocket.EventQuizEnd,
-		Payload: map[string]interface{}{
-			"quizId": quizID.String(),
-		},
-	})
-
-	return nil
+	// Delegate to state service
+	return s.stateService.EndQuiz(ctx, quizID)
 }
 
 // GetQuizSession retrieves the current state of a quiz

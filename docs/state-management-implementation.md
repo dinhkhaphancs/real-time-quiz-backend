@@ -150,44 +150,60 @@ For distributed deployments:
 
 ## State Transitions
 
-The state management system defines clear transitions between different quiz phases. Here's how the state transitions work at each stage of the quiz:
+The state management system defines clear transitions between different quiz phases:
+
+### Quiz Status (QuizStatus)
+
+Quiz status represents the overall state of a quiz:
+- `WAITING` - The quiz is created but not yet started
+- `ACTIVE` - The quiz is in progress and active
+- `COMPLETED` - The quiz has finished
+
+### Quiz Phase (QuizPhase)
+
+Quiz phase represents the specific stage within an active quiz:
+- `BETWEEN_QUESTIONS` - The quiz is active but between questions
+- `QUESTION_ACTIVE` - There is an active question being answered
+- `SHOWING_RESULTS` - The question has ended and results are being shown
 
 ### Starting a Quiz
 
 When a quiz is started:
-- Set `Status` to `QuizStatusActive`
+- Change `Status` from `WAITING` to `ACTIVE`
 - Set `StartedAt` to current time
-- Set `CurrentPhase` to `QuizPhaseBetweenQuestions`
+- Set `CurrentPhase` to `BETWEEN_QUESTIONS`
 
 ### Starting a Question
 
 When a question is activated:
+- Keep `Status` as `ACTIVE`
+- Change `CurrentPhase` from `BETWEEN_QUESTIONS` to `QUESTION_ACTIVE`
 - Set `CurrentQuestionID` to the question's ID
 - Set `CurrentQuestionStartedAt` to current time
-- Set `CurrentPhase` to `QuizPhaseQuestionActive`
 - Clear `CurrentQuestionEndedAt`
 
 ### Ending a Question
 
 When a question time expires or is manually ended:
+- Keep `Status` as `ACTIVE`
+- Change `CurrentPhase` from `QUESTION_ACTIVE` to `SHOWING_RESULTS`
 - Set `CurrentQuestionEndedAt` to current time
-- Set `CurrentPhase` to `QuizPhaseShowingResults`
 - Calculate and update participant scores
 
 ### Moving to Next Question
 
 When preparing for the next question:
-- Set `NextQuestionID` based on the quiz flow
-- When ready, transition to the next question using the Starting a Question flow
+- Keep `Status` as `ACTIVE`
+- Change `CurrentPhase` from `SHOWING_RESULTS` to `BETWEEN_QUESTIONS`
+- Set `NextQuestionID` based on the question sequence
+- When ready to show the next question, follow the "Starting a Question" flow
 
 ### Ending a Quiz
 
 When all questions are completed or the quiz is manually ended:
-- Set `Status` to `QuizStatusCompleted`
+- Change `Status` from `ACTIVE` to `COMPLETED`
 - Set `EndedAt` to current time
-- Clear `CurrentPhase` or set to a final state
-
-These transitions provide clear tracking of quiz status, current question, and what phase of the quiz you're in at any moment. This approach allows clients to display the appropriate UI based on the current state and phase of the quiz.
+- The `CurrentPhase` becomes irrelevant as the quiz is no longer active
 
 ## Repository Layer
 

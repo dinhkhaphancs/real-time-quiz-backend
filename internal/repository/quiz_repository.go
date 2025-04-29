@@ -253,8 +253,8 @@ func (r *PostgresQuizRepository) DeleteQuiz(ctx context.Context, id uuid.UUID) e
 // CreateQuizSession creates a new quiz session
 func (r *PostgresQuizRepository) CreateQuizSession(ctx context.Context, session *model.QuizSession) error {
 	query := `
-		INSERT INTO quiz_sessions (quiz_id, status)
-		VALUES ($1, $2)
+		INSERT INTO quiz_sessions (quiz_id, status, current_phase)
+		VALUES ($1, $2, $3)
 	`
 
 	_, err := r.db.ExecContext(
@@ -262,6 +262,7 @@ func (r *PostgresQuizRepository) CreateQuizSession(ctx context.Context, session 
 		query,
 		session.QuizID,
 		session.Status,
+		session.CurrentPhase,
 	)
 	return err
 }
@@ -269,7 +270,8 @@ func (r *PostgresQuizRepository) CreateQuizSession(ctx context.Context, session 
 // GetQuizSession retrieves a quiz session
 func (r *PostgresQuizRepository) GetQuizSession(ctx context.Context, quizID uuid.UUID) (*model.QuizSession, error) {
 	query := `
-		SELECT quiz_id, current_question_id, status, started_at, ended_at, current_question_started_at
+		SELECT quiz_id, current_question_id, status, current_phase, started_at, ended_at,
+		       current_question_started_at, current_question_ended_at, next_question_id
 		FROM quiz_sessions
 		WHERE quiz_id = $1
 	`
@@ -279,9 +281,12 @@ func (r *PostgresQuizRepository) GetQuizSession(ctx context.Context, quizID uuid
 		&session.QuizID,
 		&session.CurrentQuestionID,
 		&session.Status,
+		&session.CurrentPhase,
 		&session.StartedAt,
 		&session.EndedAt,
 		&session.CurrentQuestionStartedAt,
+		&session.CurrentQuestionEndedAt,
+		&session.NextQuestionID,
 	)
 
 	if err != nil {
@@ -300,10 +305,13 @@ func (r *PostgresQuizRepository) UpdateQuizSession(ctx context.Context, session 
 		UPDATE quiz_sessions
 		SET current_question_id = $1,
 			status = $2,
-			started_at = $3,
-			ended_at = $4,
-			current_question_started_at = $5
-		WHERE quiz_id = $6
+			current_phase = $3,
+			started_at = $4,
+			ended_at = $5,
+			current_question_started_at = $6,
+			current_question_ended_at = $7,
+			next_question_id = $8
+		WHERE quiz_id = $9
 	`
 
 	result, err := r.db.ExecContext(
@@ -311,9 +319,12 @@ func (r *PostgresQuizRepository) UpdateQuizSession(ctx context.Context, session 
 		query,
 		session.CurrentQuestionID,
 		session.Status,
+		session.CurrentPhase,
 		session.StartedAt,
 		session.EndedAt,
 		session.CurrentQuestionStartedAt,
+		session.CurrentQuestionEndedAt,
+		session.NextQuestionID,
 		session.QuizID,
 	)
 

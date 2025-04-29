@@ -163,22 +163,20 @@ func (h *RedisHub) StartTimerBroadcast(quizID uuid.UUID, durationSeconds int) {
 		now := time.Now()
 		if now.After(endTime) {
 			// Time's up
-			h.PublishToQuiz(quizID, Event{
-				Type: EventTimerUpdate,
-				Payload: map[string]interface{}{
-					"remainingSeconds": 0,
-				},
-			})
+			h.PublishToQuiz(quizID, NewEvent(EventTimerUpdate, map[string]interface{}{
+				"remainingSeconds": 0,
+				"totalSeconds":     durationSeconds,
+				"endTime":          endTime.Format(time.RFC3339),
+			}))
 			return
 		}
 
 		remainingSeconds := int(endTime.Sub(now).Seconds())
-		h.PublishToQuiz(quizID, Event{
-			Type: EventTimerUpdate,
-			Payload: map[string]interface{}{
-				"remainingSeconds": remainingSeconds,
-			},
-		})
+		h.PublishToQuiz(quizID, NewEvent(EventTimerUpdate, map[string]interface{}{
+			"remainingSeconds": remainingSeconds,
+			"totalSeconds":     durationSeconds,
+			"endTime":          endTime.Format(time.RFC3339),
+		}))
 	}
 }
 
